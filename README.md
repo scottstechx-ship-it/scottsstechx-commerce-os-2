@@ -46,3 +46,30 @@ For a hosted backend:
 See `12_Backend/README.md` → "Hosting" section. We provide
 `Dockerfile`, `render.yaml`, and `deploy/cloud-run.example.json`
 out of the box.
+
+## Deploy to Render
+
+The repo includes `12_Backend/render.yaml` — a Render Blueprint that
+provisions the API service + managed Postgres in one click.
+
+**One-time setup (~2 minutes):**
+1. Sign into https://dashboard.render.com with the GitHub account
+   that owns this repo (`scottstechx-ship-it`).
+2. Render will prompt to install the "Render GitHub App" on your account.
+   **Approve it for the `scottstechx-commerce-os` repo** (or all repos).
+3. After authorization, click:
+   https://dashboard.render.com/blueprints/new?repo=https://github.com/scottstechx-ship-it/scottstechx-commerce-os
+4. Render reads `12_Backend/render.yaml` and creates:
+   - `scottstechx-api` web service (Dockerfile-based)
+   - `scottstechx-db` managed Postgres
+   with `DATABASE_URL` automatically wired between them.
+5. Wait for the first deploy to finish (3-5 minutes). The URL
+   appears in the service dashboard, e.g. `https://scottstechx-api.onrender.com`.
+
+**After deploy:** the API is live. Verify with
+`curl https://<your-service>.onrender.com/healthz` →
+`{"status":"ok",...}`.
+
+**Custom domain:** buy `api.scottsstechx.example`, then in the Render
+service dashboard → Settings → Custom Domains → add it. Render issues
+the Let's Encrypt certificate automatically.
