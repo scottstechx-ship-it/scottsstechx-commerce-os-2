@@ -1,0 +1,21 @@
+# ScottsTechX Android client
+.kotlin/
+.gradle/
+build/
+.idea/
+local.properties
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+output/
+
+# Keystore
+*.jks
+*.keystore
+release/
+
+# Reports
+htmlcov/
+test-results/

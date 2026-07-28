@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ScottsTechX</string>
+
+    <!-- Auth -->
+    <string name="login_title">Sign in</string>
+    <string name="login_subtitle">ScottsTechX Commerce OS</string>
+    <string name="login_phone_hint">Phone number</string>
+    <string name="login_password_hint">Password</string>
+    <string name="login_button">Sign in</string>
+    <string name="login_demo_hint">Demo: any phone + password, backend will issue a token.</string>
+    <string name="login_role_buyer">Sign in as Buyer</string>
+    <string name="login_role_seller">Sign in as Seller</string>
+    <string name="login_role_driver">Sign in as Driver</string>
+
+    <!-- Buyer -->
+    <string name="buyer_title">Products</string>
+    <string name="buyer_cart">Cart</string>
+    <string name="buyer_checkout">Checkout</string>
+    <string name="buyer_empty_cart">Cart is empty</string>
+    <string name="buyer_checkout_success">Order placed</string>
+    <string name="buyer_checkout_failed">Checkout failed</string>
+    <string name="buyer_logout">Sign out</string>
+
+    <!-- Driver -->
+    <string name="driver_title">Assigned orders</string>
+    <string name="driver_action_pickup">Mark picked up</string>
+    <string name="driver_action_deliver">Submit proof of delivery</string>
+    <string name="driver_gps_label">GPS lat / lng</string>
+    <string name="driver_notes_label">Notes (optional)</string>
+    <string name="driver_pod_success">POD submitted</string>
+    <string name="driver_pod_failed">POD failed</string>
+    <string name="driver_logout">Sign out</string>
+
+    <!-- Generic -->
+    <string name="error_network">Network error</string>
+    <string name="error_unauthorized">Session expired. Please sign in again.</string>
+    <string name="error_unknown">Something went wrong</string>
+    <string name="error_camera_unavailable">No camera available on this device</string>
+    <string name="error_location_unavailable">Could not get a GPS fix</string>
+    <string name="error_location_denied">Location permission denied</string>
+    <string name="retry">Retry</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="loading">Loading…</string>
+
+    <!-- Tamper detection -->
+    <string name="tamper_warning_title">Device integrity check</string>
+    <string name="tamper_warning_rooted">This device appears to be rooted. Some features may be limited.</string>
+    <string name="tamper_warning_debuggable">The app is running in debug mode.</string>
+    <string name="tamper_warning_emulator">Running on an emulator.</string>
+    <string name="tamper_warning_installer">Installed from an unverified source.</string>
+    <string name="tamper_warning_dismiss">Dismiss</string>
+
+    <!-- Driver: real GPS + camera -->
+    <string name="driver_use_location">Use my location</string>
+    <string name="driver_capture_photo">Capture photo</string>
+    <string name="driver_recapture_photo">Retake photo</string>
+    <string name="driver_photo_captured">Photo attached</string>
+    <string name="driver_no_photo_yet">No photo attached</string>
+    <string name="driver_location_grant">Grant location permission</string>
+    <string name="driver_camera_grant">Grant camera permission</string>
+    <!-- Accessibility -->
+    <string name="accessibility_login_help_title">About signing in</string>
+    <string name="accessibility_login_help_body">You can sign in with your phone and a password. If you have a Google account, the Continue with Google button is faster. After you pick a role — Buyer, Seller, or Driver — the right home screen opens for you.</string>
+    <string name="accessibility_buyer_help_title">About this screen</string>
+    <string name="accessibility_buyer_help_body">You are on the products page. Tap any product to add it to your cart. The little arrow icon finds sellers near you. The chat bubble opens the AI shopping helper. Sign out is at the right.</string>
+    <string name="accessibility_seller_help_title">About your shop</string>
+    <string name="accessibility_seller_help_body">You are on the seller dashboard. The big card on top shows your sales today. The Inventory tab lists your products and lets you add, edit, or remove them. The Orders tab lists incoming customer orders. The sparkles icon opens the AI assistant.</string>
+    <string name="accessibility_continue_with_google">Continue with Google</string>
+    <string name="accessibility_or_sign_in_phone">Or sign in with phone</string>
+
+    <!-- AI -->
+    <string name="ai_assistant_title">AI Assistant</string>
+    <string name="ai_chat_title">Shopping helper</string>
+    <string name="ai_chat_placeholder">Ask anything…</string>
+    <string name="ai_chat_send">Send</string>
+    <string name="ai_disabled_banner_title">AI is not configured</string>
+    <string name="ai_disabled_banner_body">Set LLM_API_KEY and AI_PROVIDER on the server to enable AI features. The buttons below will keep working — they just won\'t generate suggestions until then.</string>
+    <string name="ai_accept">Accept</string>
+    <string name="ai_try_again">Try again</string>
+</resources>

@@ -1,0 +1,39 @@
+# Build artifacts — never push
+**/node_modules/
+**/build/
+**/dist/
+**/.gradle/
+**/out/
+**/coverage/
+
+# Toolchains (large, can be re-downloaded)
+android-toolchain/
+
+# Secrets and environment
+.env
+.env.*
+!.env.example
+**/local.properties
+*.jks
+*.keystore
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.iml
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sister projects unrelated to deploy (the user keeps these locally only)
+ai-chat-server/
+android-remote-app/
+android-remote-control-server/
+Scotts-Company-Tools/
+memory-kb-module/
+nextjs-starter/
+research-tools/
+company-website/

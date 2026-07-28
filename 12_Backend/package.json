@@ -1,0 +1,42 @@
+{
+  "name": "scottstechx-commerce-os-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ScottsTechX Uganda MVP modular monolith backend",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "tsx src/smoke.ts"
+  },
+  "dependencies": {
+    "@embedded-postgres/windows-x64": "^18.4.0-beta.17",
+    "@fastify/multipart": "^10.1.0",
+    "@types/node": "^22.20.1",
+    "@types/pg": "^8.20.0",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "fastify": "^5.10.0",
+    "jose": "^6.2.4",
+    "pg": "^8.22.0",
+    "tsx": "^4.23.1",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
+  },
+  "allowScripts": {
+    "@embedded-postgres/windows-x64@18.4.0-beta.17": true
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
+    "@vitest/coverage-v8": "^2.1.9",
+    "eslint": "^10.8.0",
+    "prettier": "^3.9.6",
+    "vitest": "^2.1.9"
+  }
+}

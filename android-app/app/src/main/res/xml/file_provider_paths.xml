@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Grants the camera intent write access to files inside cache/pod/ via
+  the standard FileProvider authority. The DriverScreen uses
+  PodCapture.newPhotoUri() to mint a Uri, and the camera intent writes
+  the JPEG to it.
+-->
+<paths>
+    <cache-path
+        name="pod"
+        path="pod/" />
+</paths>

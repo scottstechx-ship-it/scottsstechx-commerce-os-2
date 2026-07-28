@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Base theme is the empty Material 3 day/night parent. Compose owns the
+      real colors; this XML theme is just the splash + status-bar layer.
+    -->
+    <style name="Theme.ScottsTechX" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#FF1B5E20</item>
+        <item name="android:windowBackground">#FFFFFFFF</item>
+    </style>
+</resources>

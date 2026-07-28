@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive launcher icon. Foreground is the ScottsTechX company logo
+  rendered as a vector at the adaptive icon's safe-area viewport
+  (the inner 66dp of the 108dp viewport). Background is a solid
+  Scotts green. The legacy `mipmap-nodpi/ic_launcher.png` is the
+  full-bleed logo for pre-API-26 launchers.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

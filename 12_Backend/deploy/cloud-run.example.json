@@ -1,0 +1,23 @@
+{
+  "_comment": "Documentation only — not consumed at runtime. Run `gcloud run deploy` with these env vars (use Secret Manager for the secrets).",
+  "name": "scottstechx-api",
+  "runtime": "nodejs22",
+  "region": "us-central1",
+  "source": ".",
+  "memory": "512Mi",
+  "cpu": 1,
+  "concurrency": 80,
+  "timeoutSeconds": 60,
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "3001",
+    "LOG_LEVEL": "info",
+    "JWT_SECRET": "@scottstechx-jwt-secret",
+    "DATABASE_URL": "@scottstechx-db-url",
+    "AI_PROVIDER": "openai",
+    "LLM_API_KEY": "@scottstechx-llm-key",
+    "GOOGLE_CLIENT_ID": "@scottstechx-google-client-id",
+    "ALLOWED_ORIGINS": "https://admin.scottstechx.example,https://app.scottstechx.example"
+  },
+  "ingress": "all"
+}

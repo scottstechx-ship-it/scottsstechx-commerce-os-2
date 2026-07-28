@@ -1,0 +1,608 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ScottsTechX Commerce OS API",
+    "version": "1.0.0",
+    "description": "Trust-gated marketplace backend for the Uganda MVP slice.\n\nThis spec is the source of truth for clients (Flutter, web, admin). It mirrors\nthe implementation in `12_Backend/src/server.ts` and the migration-derived\nschema. Endpoints marked `STUB` return HTTP 501 with `X-Stub-Reason` header\nand do NOT perform any external I/O.\n\n## Authentication\n\nAll endpoints require `Authorization: Bearer ***` where the token is an\nHS256 JWT with the following claims:\n  - `iss`: must equal `scottstechx`\n  - `aud`: must equal `scottstechx-api`\n  - `sub`: user's UUID\n  - `role`: one of `buyer | driver | seller | admin`\n  - `exp`: present and not in the past\n\n## Idempotency\n\n`POST` and `PATCH` endpoints that change state require an `Idempotency-Key`\nheader of at least 8 characters. Replays with the same body return the\noriginal response. Replays with a different body under the same key return\nHTTP 409.\n\n## Error format\n\nAll errors return JSON: `{ error: string, message: string, details?: any }`.\nThe `error` field is a stable machine-readable code.",
+    "license": { "name": "Proprietary" }
+  },
+  "servers": [
+    { "url": "http://localhost:3001", "description": "Local dev" }
+  ],
+  "tags": [
+    { "name": "orders" },
+    { "name": "logistics" },
+    { "name": "marketplace" },
+    { "name": "ai" },
+    { "name": "auth" },
+    { "name": "system" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "OrderItem": {
+        "type": "object",
+        "required": ["product_id", "qty", "unit_price_minor", "line_total_minor"],
+        "properties": {
+          "product_id": { "type": "string", "format": "uuid" },
+          "qty": { "type": "integer", "minimum": 1 },
+          "unit_price_minor": { "type": "integer", "minimum": 0 },
+          "line_total_minor": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "DeliveryAddress": {
+        "type": "object",
+        "required": ["line1", "city", "country"],
+        "properties": {
+          "line1": { "type": "string", "maxLength": 200 },
+          "city": { "type": "string", "maxLength": 100 },
+          "country": { "type": "string", "enum": ["UG"] }
+        }
+      },
+      "CheckoutRequest": {
+        "type": "object",
+        "required": ["items", "delivery_address"],
+        "properties": {
+          "items": {
+            "type": "array", "minItems": 1, "maxItems": 50,
+            "items": { "$ref": "#/components/schemas/OrderItemInput" }
+          },
+          "delivery_address": { "$ref": "#/components/schemas/DeliveryAddress" }
+        }
+      },
+      "OrderItemInput": {
+        "type": "object",
+        "required": ["product_id", "qty"],
+        "properties": {
+          "product_id": { "type": "string", "format": "uuid" },
+          "qty": { "type": "integer", "minimum": 1, "maximum": 999 }
+        }
+      },
+      "CheckoutResponse": {
+        "type": "object",
+        "required": ["order_id", "status", "total_minor", "currency", "fx_rate_snapshot", "items"],
+        "properties": {
+          "order_id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["created","paid","assigned","picked_up","delivered","cancelled","refunded"] },
+          "total_minor": { "type": "integer", "minimum": 0 },
+          "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+          "fx_rate_snapshot": { "type": "string" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/OrderItem" } }
+        }
+      },
+      "PodRequest": {
+        "type": "object",
+        "required": ["order_id", "action", "gps_lat", "gps_lng"],
+        "properties": {
+          "order_id": { "type": "string", "format": "uuid" },
+          "action": { "type": "string", "enum": ["pickup", "deliver"] },
+          "gps_lat": { "type": "number", "minimum": -90, "maximum": 90 },
+          "gps_lng": { "type": "number", "minimum": -180, "maximum": 180 },
+          "notes": { "type": "string", "maxLength": 500 }
+        }
+      },
+      "PodResponse": {
+        "type": "object",
+        "required": ["order_id", "status"],
+        "properties": {
+          "order_id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["picked_up", "delivered"] }
+        }
+      },
+      "SellerNearby": {
+        "type": "object",
+        "required": ["sellerId","displayName","businessName","trustTier","trustScore","distanceMetres","rankScore","productCount","activeOrderCount","ratingAvg","ratingCount","isVerified"],
+        "properties": {
+          "sellerId": { "type": "string", "format": "uuid" },
+          "displayName": { "type": "string" },
+          "businessName": { "type": "string" },
+          "avatarUrl": { "type": "string", "nullable": true },
+          "trustTier": { "type": "string", "enum": ["BRONZE","SILVER","GOLD","PLATINUM"] },
+          "trustScore": { "type": "number", "minimum": 0, "maximum": 100 },
+          "distanceMetres": { "type": "number", "minimum": 0 },
+          "rankScore": { "type": "number", "minimum": 0, "maximum": 100 },
+          "productCount": { "type": "integer", "minimum": 0 },
+          "activeOrderCount": { "type": "integer", "minimum": 0 },
+          "ratingAvg": { "type": "number", "minimum": 0, "maximum": 5 },
+          "ratingCount": { "type": "integer", "minimum": 0 },
+          "isVerified": { "type": "boolean" }
+        }
+      },
+      "SellerDetail": {
+        "type": "object",
+        "required": ["sellerId","displayName","businessName","trustScore","ratingAvg","ratingCount","totalCompletedOrders","totalDisputes","isVerified","products","reviews"],
+        "properties": {
+          "sellerId": { "type": "string", "format": "uuid" },
+          "displayName": { "type": "string" },
+          "businessName": { "type": "string" },
+          "businessDescription": { "type": "string", "nullable": true },
+          "avatarUrl": { "type": "string", "nullable": true },
+          "bannerUrl": { "type": "string", "nullable": true },
+          "address": { "type": "string", "nullable": true },
+          "opensAt": { "type": "string", "nullable": true },
+          "closesAt": { "type": "string", "nullable": true },
+          "isVerified": { "type": "boolean" },
+          "trustScore": { "type": "number" },
+          "ratingAvg": { "type": "number" },
+          "ratingCount": { "type": "integer" },
+          "totalCompletedOrders": { "type": "integer" },
+          "totalDisputes": { "type": "integer" },
+          "products": { "type": "array", "items": { "$ref": "#/components/schemas/Product" } },
+          "reviews": { "type": "array", "items": { "$ref": "#/components/schemas/SellerReview" } }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "required": ["id","title","priceMinor","currency","stockQuantity","productTrustScore","isActive"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "priceMinor": { "type": "integer" },
+          "currency": { "type": "string" },
+          "stockQuantity": { "type": "integer" },
+          "productTrustScore": { "type": "number" },
+          "imageUrl": { "type": "string", "nullable": true },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "SellerReview": {
+        "type": "object",
+        "required": ["id","reviewerUserId","reviewerDisplayName","rating","body","createdAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "reviewerUserId": { "type": "string", "format": "uuid" },
+          "reviewerDisplayName": { "type": "string" },
+          "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "body": { "type": "string" },
+          "createdAt": { "type": "string" }
+        }
+      },
+      "SellerStats": {
+        "type": "object",
+        "required": ["sellerId","activeListings","totalListings","ordersToday","ordersThisWeek","revenueMinorToday","revenueMinorThisWeek","currency","averageRating","ratingCount"],
+        "properties": {
+          "sellerId": { "type": "string", "format": "uuid" },
+          "activeListings": { "type": "integer" },
+          "totalListings": { "type": "integer" },
+          "ordersToday": { "type": "integer" },
+          "ordersThisWeek": { "type": "integer" },
+          "revenueMinorToday": { "type": "integer" },
+          "revenueMinorThisWeek": { "type": "integer" },
+          "currency": { "type": "string" },
+          "averageRating": { "type": "number" },
+          "ratingCount": { "type": "integer" }
+        }
+      },
+      "CreateProductRequest": {
+        "type": "object",
+        "required": ["title","description","priceMinor","currency","stockQuantity"],
+        "properties": {
+          "title": { "type": "string", "maxLength": 80 },
+          "description": { "type": "string", "maxLength": 500 },
+          "priceMinor": { "type": "integer", "minimum": 0 },
+          "currency": { "type": "string" },
+          "stockQuantity": { "type": "integer", "minimum": 0 },
+          "imageUrl": { "type": "string", "nullable": true }
+        }
+      },
+      "UpdateProductRequest": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "maxLength": 80 },
+          "description": { "type": "string", "maxLength": 500 },
+          "priceMinor": { "type": "integer", "minimum": 0 },
+          "stockQuantity": { "type": "integer", "minimum": 0 },
+          "imageUrl": { "type": "string", "nullable": true },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "GoogleAuthRequest": {
+        "type": "object",
+        "required": ["idToken"],
+        "properties": {
+          "idToken": { "type": "string", "minLength": 10 },
+          "role": { "type": "string", "enum": ["buyer","seller","driver"] }
+        }
+      },
+      "GoogleAuthResponse": {
+        "type": "object",
+        "required": ["token","userId","role","email"],
+        "properties": {
+          "token": { "type": "string" },
+          "userId": { "type": "string" },
+          "role": { "type": "string" },
+          "email": { "type": "string" },
+          "expiresAt": { "type": "string" },
+          "trustTier": { "type": "string" }
+        }
+      },
+      "AiStatus": {
+        "type": "object",
+        "required": ["enabled"],
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "provider": { "type": "string", "nullable": true }
+        }
+      },
+      "AiSellerSuggestRequest": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "type": "string", "enum": ["product_description","auto_price","category","inventory_warning"] },
+          "draft": { "type": "object" },
+          "context": { "type": "object" }
+        }
+      },
+      "AiSellerSuggestResponse": {
+        "type": "object",
+        "required": ["suggestion","reasoning","confidence","provider"],
+        "properties": {
+          "suggestion": { "type": "string" },
+          "reasoning": { "type": "string" },
+          "confidence": { "type": "number" },
+          "provider": { "type": "string" }
+        }
+      },
+      "AiCustomerChatRequest": {
+        "type": "object",
+        "required": ["sessionId","message"],
+        "properties": {
+          "sessionId": { "type": "string" },
+          "message": { "type": "string" },
+          "history": { "type": "array", "items": { "type": "object" } }
+        }
+      },
+      "AiCustomerChatResponse": {
+        "type": "object",
+        "required": ["reply","provider"],
+        "properties": {
+          "reply": { "type": "string" },
+          "provider": { "type": "string" }
+        }
+      },
+      "AiReasonRequest": {
+        "type": "object",
+        "required": ["sellerId"],
+        "properties": {
+          "sellerId": { "type": "string", "format": "uuid" },
+          "context": { "type": "object" }
+        }
+      },
+      "AiReasonResponse": {
+        "type": "object",
+        "required": ["trustReasoning","rankReasoning","recommendation","provider","confidence"],
+        "properties": {
+          "trustReasoning": { "type": "string" },
+          "rankReasoning": { "type": "string" },
+          "recommendation": { "type": "string" },
+          "provider": { "type": "string" },
+          "confidence": { "type": "number" }
+        }
+      },
+      "CreateReviewRequest": {
+        "type": "object",
+        "required": ["sellerId","rating"],
+        "properties": {
+          "sellerId": { "type": "string", "format": "uuid" },
+          "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "body": { "type": "string", "maxLength": 2000 }
+        }
+      },
+      "Review": {
+        "type": "object",
+        "required": ["id","sellerId","reviewerUserId","rating","body","createdAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "sellerId": { "type": "string", "format": "uuid" },
+          "reviewerUserId": { "type": "string", "format": "uuid" },
+          "rating": { "type": "integer" },
+          "body": { "type": "string" },
+          "createdAt": { "type": "string" }
+        }
+      },
+      "ChatMessage": {
+        "type": "object",
+        "required": ["id","senderUserId","role","content","sessionId","createdAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "senderUserId": { "type": "string", "format": "uuid" },
+          "recipientUserId": { "type": "string", "nullable": true },
+          "role": { "type": "string" },
+          "content": { "type": "string" },
+          "sessionId": { "type": "string" },
+          "createdAt": { "type": "string" }
+        }
+      },
+      "PostChatMessageRequest": {
+        "type": "object",
+        "required": ["sessionId","content"],
+        "properties": {
+          "sessionId": { "type": "string" },
+          "content": { "type": "string" },
+          "recipientUserId": { "type": "string", "nullable": true },
+          "role": { "type": "string", "enum": ["buyer","seller","ai","system"] }
+        }
+      },
+      "SellerProfilePatch": {
+        "type": "object",
+        "properties": {
+          "businessName": { "type": "string" },
+          "businessDescription": { "type": "string", "nullable": true },
+          "address": { "type": "string", "nullable": true },
+          "lat": { "type": "number", "nullable": true },
+          "lng": { "type": "number", "nullable": true },
+          "avatarUrl": { "type": "string", "nullable": true },
+          "bannerUrl": { "type": "string", "nullable": true },
+          "opensAt": { "type": "string", "nullable": true },
+          "closesAt": { "type": "string", "nullable": true }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error", "message"],
+        "properties": {
+          "error": { "type": "string" },
+          "message": { "type": "string" },
+          "details": {}
+        }
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": ["system"], "summary": "Liveness probe", "security": [],
+        "responses": { "200": { "description": "Service is up" } }
+      }
+    },
+    "/api/v1/healthz": {
+      "get": {
+        "tags": ["system"], "summary": "Liveness probe (v1)", "security": [],
+        "responses": { "200": { "description": "Service is up" } }
+      }
+    },
+    "/api/v1/orders/checkout": {
+      "post": {
+        "tags": ["orders"], "summary": "Initiate a buyer order checkout",
+        "parameters": [{ "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 8 } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CheckoutRequest" } } } },
+        "responses": {
+          "201": { "description": "Order created" },
+          "200": { "description": "Idempotent replay" },
+          "400": { "description": "Validation error" },
+          "401": { "description": "Missing or invalid JWT" },
+          "403": { "description": "Caller is not a buyer" },
+          "409": { "description": "Idempotency-Key reused with different body" },
+          "422": { "description": "Stock or validation failure" },
+          "501": { "description": "Stub: mobile money not yet integrated" }
+        }
+      }
+    },
+    "/api/v1/logistics/pod": {
+      "post": {
+        "tags": ["logistics"], "summary": "Submit proof of delivery",
+        "parameters": [{ "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 8 } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PodRequest" } } } },
+        "responses": {
+          "200": { "description": "POD accepted" },
+          "400": { "description": "Validation error" },
+          "401": { "description": "Missing or invalid JWT" },
+          "403": { "description": "Caller is not the assigned driver" },
+          "404": { "description": "Order not found" },
+          "409": { "description": "Illegal state transition" }
+        }
+      }
+    },
+    "/api/v1/sellers/nearby": {
+      "get": {
+        "tags": ["marketplace"], "summary": "List sellers ranked near a point",
+        "parameters": [
+          { "name": "lat", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "lng", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "radiusKm", "in": "query", "required": false, "schema": { "type": "number", "default": 25 } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "default": 50 } }
+        ],
+        "responses": {
+          "200": { "description": "Sellers ranked by server-side composite score", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/SellerNearby" } } } } },
+          "400": { "description": "Validation error" },
+          "401": { "description": "Missing or invalid JWT" }
+        }
+      }
+    },
+    "/api/v1/sellers/{sellerId}": {
+      "get": {
+        "tags": ["marketplace"], "summary": "Get seller profile, products, reviews",
+        "parameters": [{ "name": "sellerId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Seller detail", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SellerDetail" } } } },
+          "404": { "description": "Seller not found" },
+          "401": { "description": "Missing or invalid JWT" }
+        }
+      }
+    },
+    "/api/v1/seller/profile": {
+      "get": {
+        "tags": ["marketplace"], "summary": "Get my seller profile (seller only)",
+        "responses": {
+          "200": { "description": "Profile", "content": { "application/json": { "schema": { "type": "object" } } } },
+          "401": { "description": "Missing or invalid JWT" },
+          "403": { "description": "Caller is not a seller" }
+        }
+      },
+      "patch": {
+        "tags": ["marketplace"], "summary": "Update my seller profile",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SellerProfilePatch" } } } },
+        "responses": {
+          "200": { "description": "Updated" },
+          "401": { "description": "Missing or invalid JWT" },
+          "403": { "description": "Caller is not a seller" },
+          "404": { "description": "No fields to update" }
+        }
+      }
+    },
+    "/api/v1/seller/inventory": {
+      "get": {
+        "tags": ["marketplace"], "summary": "List my inventory (seller only)",
+        "responses": {
+          "200": { "description": "Inventory list" },
+          "401": { "description": "Missing or invalid JWT" },
+          "403": { "description": "Caller is not a seller" }
+        }
+      },
+      "post": {
+        "tags": ["marketplace"], "summary": "Create product (seller only)",
+        "parameters": [{ "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 8 } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateProductRequest" } } } },
+        "responses": {
+          "201": { "description": "Created" },
+          "400": { "description": "Validation error or missing Idempotency-Key" },
+          "401": { "description": "Missing or invalid JWT" },
+          "403": { "description": "Caller is not a seller" }
+        }
+      }
+    },
+    "/api/v1/seller/inventory/{productId}": {
+      "patch": {
+        "tags": ["marketplace"], "summary": "Patch product (seller only)",
+        "parameters": [
+          { "name": "productId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 8 } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateProductRequest" } } } },
+        "responses": {
+          "200": { "description": "Updated" },
+          "400": { "description": "No fields to update" },
+          "401": { "description": "Missing or invalid JWT" },
+          "403": { "description": "Caller is not the product's seller" },
+          "404": { "description": "Product not found" }
+        }
+      },
+      "delete": {
+        "tags": ["marketplace"], "summary": "Soft-delete product (seller only)",
+        "parameters": [
+          { "name": "productId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 8 } }
+        ],
+        "responses": {
+          "204": { "description": "Deleted" },
+          "401": { "description": "Missing or invalid JWT" },
+          "403": { "description": "Caller is not the product's seller" },
+          "404": { "description": "Product not found" }
+        }
+      }
+    },
+    "/api/v1/seller/stats": {
+      "get": {
+        "tags": ["marketplace"], "summary": "Dashboard stats for the signed-in seller",
+        "responses": {
+          "200": { "description": "Stats", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SellerStats" } } } },
+          "401": { "description": "Missing or invalid JWT" },
+          "403": { "description": "Caller is not a seller" }
+        }
+      }
+    },
+    "/api/v1/seller/orders": {
+      "get": {
+        "tags": ["marketplace"], "summary": "Orders for the signed-in seller",
+        "parameters": [{ "name": "status", "in": "query", "required": false, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Orders" },
+          "401": { "description": "Missing or invalid JWT" },
+          "403": { "description": "Caller is not a seller" }
+        }
+      }
+    },
+    "/api/v1/reviews": {
+      "post": {
+        "tags": ["marketplace"], "summary": "Post a seller review",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateReviewRequest" } } } },
+        "responses": {
+          "201": { "description": "Created" },
+          "400": { "description": "Validation error" },
+          "404": { "description": "Seller not found" }
+        }
+      }
+    },
+    "/api/v1/chat/messages": {
+      "get": {
+        "tags": ["marketplace"], "summary": "List chat messages for a session",
+        "parameters": [
+          { "name": "sessionId", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "since", "in": "query", "required": false, "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": { "200": { "description": "Messages" } }
+      },
+      "post": {
+        "tags": ["marketplace"], "summary": "Post a chat message",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PostChatMessageRequest" } } } },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/api/v1/ai/status": {
+      "get": {
+        "tags": ["ai"], "summary": "AI capability check",
+        "security": [],
+        "responses": {
+          "200": { "description": "Status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AiStatus" } } } }
+        }
+      }
+    },
+    "/api/v1/ai/seller-suggest": {
+      "post": {
+        "tags": ["ai"], "summary": "AI suggestion for seller copy/pricing/category/inventory",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AiSellerSuggestRequest" } } } },
+        "responses": {
+          "200": { "description": "Suggestion", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AiSellerSuggestResponse" } } } },
+          "401": { "description": "Missing or invalid JWT" },
+          "403": { "description": "Caller is not a seller" },
+          "429": { "description": "Rate limited" },
+          "503": { "description": "AI not configured (set LLM_API_KEY)" }
+        }
+      }
+    },
+    "/api/v1/ai/customer-chat": {
+      "post": {
+        "tags": ["ai"], "summary": "AI customer chatbot",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AiCustomerChatRequest" } } } },
+        "responses": {
+          "200": { "description": "Reply", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AiCustomerChatResponse" } } } },
+          "401": { "description": "Missing or invalid JWT" },
+          "429": { "description": "Rate limited" },
+          "503": { "description": "AI not configured (set LLM_API_KEY)" }
+        }
+      }
+    },
+    "/api/v1/ai/reason": {
+      "post": {
+        "tags": ["ai"], "summary": "AI trust/rank reasoning for a seller",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AiReasonRequest" } } } },
+        "responses": {
+          "200": { "description": "Reasoning", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AiReasonResponse" } } } },
+          "401": { "description": "Missing or invalid JWT" },
+          "429": { "description": "Rate limited" },
+          "503": { "description": "AI not configured (set LLM_API_KEY)" }
+        }
+      }
+    },
+    "/api/v1/auth/google": {
+      "post": {
+        "tags": ["auth"], "summary": "Exchange Google idToken for our own JWT",
+        "security": [],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GoogleAuthRequest" } } } },
+        "responses": {
+          "200": { "description": "JWT issued", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GoogleAuthResponse" } } } },
+          "400": { "description": "Validation error" },
+          "503": { "description": "Google sign-in not configured (set GOOGLE_CLIENT_ID)" }
+        }
+      }
+    }
+  }
+}
