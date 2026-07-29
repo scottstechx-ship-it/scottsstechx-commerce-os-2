@@ -15,7 +15,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY package.json package-lock.json ./
 # Approve the embedded-postgres postinstall explicitly so the binary downloads.
 ENV npm_config_allow_scripts="@embedded-postgres/linux-x64 @embedded-postgres/linux-arm64"
-RUN npm install --no-audit --no-fund
+# --os=linux --cpu=x64 tells npm to skip any transitive dep whose os/cpu
+# does not match the runtime (e.g. @embedded-postgres/windows-x64). Without
+# this, npm exits non-zero on EBADPLATFORM even when the package is marked
+# optional in the lockfile.
+RUN npm install --no-audit --no-fund --os=linux --cpu=x64
 
 # Copy source and build.
 COPY tsconfig.json ./
