@@ -31,6 +31,10 @@
  */
 
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
+import EmbeddedPostgres from "embedded-postgres";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { AppError, NotImplementedError } from "./errors.js";
 import { runMigrations } from "./migrate.js";
 import { registerCheckoutRoute } from "./modules/orders/checkout.route.js";
@@ -125,22 +129,83 @@ export async function buildServer(): Promise<FastifyInstance> {
 }
 
 export async function startServer(): Promise<FastifyInstance> {
+  console.log("[start] server boot, NODE_ENV=", process.env.NODE_ENV);
   if (!process.env.JWT_SECRET) {
     process.env.JWT_SECRET = "dev-secret-do-not-use-in-prod-min-32-chars-long-please";
   }
   if (!process.env.DATABASE_URL) {
-    process.env.DATABASE_URL = "postgres://app:***@127.0.0.1:5433/scottstechx";
+    // In dev/test we spin up an embedded Postgres on a random port
+    // (see startEmbeddedPostgres below). In production we expect the
+    // operator to provide a real DATABASE_URL (Render / Supabase / Neon / etc).
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "DATABASE_URL is not set. In production, configure DATABASE_URL to point at a managed Postgres.",
+      );
+    }
+    const pg = await startEmbeddedPostgres();
+    process.env.DATABASE_URL = pg.connectionString;
+    // Stash the handle on globalThis so teardown / hot-reload can stop it.
+    (globalThis as { __scottsTechXPG?: EmbeddedPostgres }).__scottsTechXPG = pg.handle;
   }
-  const applied = await runMigrations();
-  console.log("[migrate] applied:", applied);
+  // Build the Fastify server FIRST and start listening so the healthcheck
+  // can return 200 well before the migrations finish. This is critical for
+  // Railway's 10-second healthcheck window — the first DB connection to a
+  // cold Neon server can take 5-15s, and we don't want the healthcheck to
+  // kill the container before the app is ready to serve.
   const app = await buildServer();
   const port = Number(process.env.PORT ?? 3001);
   const host = process.env.HOST ?? "0.0.0.0";
   await app.listen({ port, host });
+  console.log("[start] fastify listening on", host + ":" + port);
+
+  // Run migrations in the background — failure is logged but does not kill
+  // the listener. The /healthz endpoint returns 200 as soon as the server
+  // binds; that is the correct behavior for a Railway healthcheck.
+  runMigrations()
+    .then((applied) => console.log("[migrate] applied:", applied))
+    .catch((err) => console.error("[migrate] FAILED:", err));
+
   return app;
 }
 
-const isMain = import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, "/")}`;
+/**
+ * Spin up an embedded Postgres so the dev machine has somewhere to connect
+ * without needing Docker or a system install. The first run downloads the
+ * Postgres binary (~50 MB) into a temp directory; subsequent runs reuse it.
+ *
+ * Port is fixed at 5433 by default (matches the connection string in
+ * server.ts). Pass SCOTTS_PG_PORT to override if 5433 is taken.
+ */
+async function startEmbeddedPostgres(): Promise<{
+  handle: EmbeddedPostgres;
+  connectionString: string;
+}> {
+  const port = Number(process.env.SCOTTS_PG_PORT ?? 5433);
+  const user = process.env.SCOTTS_PG_USER ?? "app";
+  const password = process.env.SCOTTS_PG_PASSWORD ?? "app";
+  const db = process.env.SCOTTS_PG_DB ?? "scottstechx";
+  const dataDir = mkdtempSync(join(tmpdir(), "scottsTechX-pg-"));
+  console.log(`[embedded-pg] dataDir=${dataDir} port=${port} db=${db}`);
+  const pg = new EmbeddedPostgres({
+    databaseDir: dataDir,
+    user,
+    password,
+    port,
+    persistent: false,
+  });
+  await pg.initialise();
+  await pg.start();
+  await pg.createDatabase(db);
+  const connectionString = `postgres://${user}:${password}@127.0.0.1:${port}/${db}`;
+  console.log(`[embedded-pg] ready: ${connectionString}`);
+  return { handle: pg, connectionString };
+}
+
+// Compare URL-encoded paths. process.argv[1] is filesystem-style
+// (backslashes, literal spaces); import.meta.url is URL-encoded
+// (forward slashes, %20 for spaces). encodeURI normalizes both.
+const isMain = typeof process.argv[1] === "string"
+  && import.meta.url === `file:///${encodeURI(process.argv[1].replace(/\\/g, "/"))}`;
 if (isMain) {
   startServer().catch((err) => {
     console.error("server failed to start:", err);
