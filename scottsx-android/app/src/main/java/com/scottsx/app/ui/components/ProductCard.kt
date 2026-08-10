@@ -1,0 +1,241 @@
+package com.scottsx.app.ui.components
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.scottsx.app.data.domain.Product
+import com.scottsx.app.data.WishlistStore
+import com.scottsx.app.ui.theme.ScottsTechXColors
+import com.scottsx.app.ui.util.formatUgx
+
+/**
+ * Compact premium product card used by Flash Deals and
+ * Recommended rows.
+ *
+ *   ┌─────────────────────────┐
+ *   │  [PRODUCT IMAGE]  -15%  │
+ *   │                  ♡      │
+ *   │                         │
+ *   │  Product Name           │
+ *   │  Short description     │
+ *   │  UGX 1,150,000         │
+ *   │  UGX 1,350,000 strikethrough│
+ *   │                       + │
+ *   └─────────────────────────┘
+ */
+@Composable
+fun ProductCard(
+    product: Product,
+    onClick: () -> Unit = {},
+    onAddToCart: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    width: androidx.compose.ui.unit.Dp = 180.dp,
+) {
+    val isFav by remember(product.id) {
+        mutableStateOf(WishlistStore.contains(product.id))
+    }
+    var heartBump by remember { mutableStateOf(false) }
+    val heartScale by animateFloatAsState(
+        targetValue = if (heartBump) 1.3f else 1.0f,
+        label = "heart-bump",
+    )
+
+    Column(
+        modifier = modifier
+            .width(width)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White)
+            .clickable { onClick() },
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .padding(8.dp),
+        ) {
+            ProductImage(
+                imageKey = product.imageUrl,
+                categoryLabel = product.category.displayName,
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            // Discount badge
+            if (product.discountPercent > 0) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    ScottsTechXColors.BluePrimary,
+                                    ScottsTechXColors.BluePrimaryLight,
+                                ),
+                            ),
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = "-${product.discountPercent}%",
+                        color = Color.White,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 11.sp,
+                    )
+                }
+            }
+
+            // Favorite (heart) toggle
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.92f))
+                    .clickable {
+                        WishlistStore.toggle(product.id)
+                        heartBump = true
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = "Favorite",
+                    tint = if (isFav) Color(0xFFE11D48) else Color(0xFF6B7280),
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clip(CircleShape),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(2.dp))
+
+        // Product name
+        Text(
+            text = product.name,
+            color = ScottsTechXColors.OnLight,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 6.dp),
+        )
+
+        // Short description
+        Text(
+            text = product.shortDescription,
+            color = ScottsTechXColors.OnLightSecondary,
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
+
+        Spacer(Modifier.height(6.dp))
+
+        // Price + old price
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Text(
+                text = formatUgx(product.priceUgx),
+                color = ScottsTechXColors.OnLight,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 14.sp,
+            )
+            product.oldPriceUgx?.let { old ->
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = formatUgx(old),
+                    color = ScottsTechXColors.OnLightSecondary,
+                    fontSize = 11.sp,
+                    textDecoration = TextDecoration.LineThrough,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        // Rating row + add-to-cart button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 8.dp, bottom = 8.dp, top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = null,
+                tint = Color(0xFFFBBF24),
+                modifier = Modifier.size(13.dp),
+            )
+            Spacer(Modifier.width(2.dp))
+            Text(
+                text = "%.1f".format(product.rating),
+                color = ScottsTechXColors.OnLightSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(Modifier.weight(1f))
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                ScottsTechXColors.BluePrimary,
+                                ScottsTechXColors.BluePrimaryLight,
+                            ),
+                        ),
+                    )
+                    .clickable { onAddToCart() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = "Add to cart",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+    }
+}
