@@ -165,3 +165,95 @@ object SessionCache {
         email = null
     }
 }
+// =====================================================================================
+// Seller domain models — Stage 3.2 seller dashboard.
+// =====================================================================================
+
+/** Whether a seller is currently accepting new orders. */
+enum class StoreStatus(val label: String) {
+    Online("Online"),
+    Away("Away"),
+}
+
+/** A single buyer order as seen by the seller. */
+data class SellerOrder(
+    val id: String,                      // e.g. "STX-10482"
+    val productName: String,
+    val productImageUrl: String? = null,
+    val itemsCount: Int,
+    val totalUgx: Long,
+    val placedAtLabel: String,           // e.g. "10:30 AM"
+    val status: OrderStatus,
+    val buyerName: String,
+    val buyerInitial: String = buyerName.firstOrNull()?.uppercase() ?: "?",
+)
+
+enum class OrderStatus(val label: String) {
+    Pending("Pending"),
+    Processing("Processing"),
+    Ready("Ready"),
+    Completed("Completed"),
+    Cancelled("Cancelled");
+
+    companion object {
+        fun fromLabel(label: String): OrderStatus =
+            values().firstOrNull { it.label.equals(label, ignoreCase = true) } ?: Pending
+    }
+}
+
+/** Recent orders overview counters (Pending / Processing / Ready / Completed). */
+data class SellerOrdersOverview(
+    val pending: Int,
+    val processing: Int,
+    val ready: Int,
+    val completed: Int,
+)
+
+/** One sales bar in the Sales Performance chart. */
+data class SalesPoint(
+    val label: String,                    // "Mon", "Tue", ...
+    val amountUgx: Long,
+)
+
+/** Result of the Seller AI Assistant. */
+data class SellerAiInsight(
+    val headline: String,
+    val body: String,
+    val bestProduct: String,
+    val trendLabel: String,               // e.g. "+18% this week"
+)
+
+/** Low-stock alert row. */
+data class LowStockAlert(
+    val productId: String,
+    val productName: String,
+    val remaining: Int,
+    val threshold: Int,
+)
+
+/**
+ * A snapshot of the seller's dashboard data. All numbers below are
+ * seeded in `SellerDataSource`; once the backend lands, swap them
+ * for Firestore queries that read from the existing `users`,
+ * `products`, `orders` collections.
+ */
+data class SellerDashboardSnapshot(
+    val displayName: String,
+    val storeName: String,
+    val storeId: String,
+    val email: String,
+    val status: StoreStatus,
+    val salesTodayUgx: Long,
+    val salesTodayDeltaPct: Float,
+    val ordersToday: Int,
+    val ordersTodayDelta: Int,
+    val customersTotal: Int,
+    val customersDelta: Int,
+    val rating: Float,
+    val ratingLabel: String,
+    val ordersOverview: SellerOrdersOverview,
+    val recentOrders: List<SellerOrder>,
+    val sales: List<SalesPoint>,
+    val aiInsight: SellerAiInsight,
+    val lowStock: List<LowStockAlert>,
+)

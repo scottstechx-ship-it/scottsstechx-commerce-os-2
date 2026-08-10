@@ -255,6 +255,18 @@ fun AppNavigation() {
                 onNavigateToAi = { navController.navigate(Routes.AI) },
                 onNavigateToAllProducts = { navController.navigate(Routes.CATEGORIES) },
                 onTabSelect = { tab -> onBuyerTab(navController, tab) },
+                // Stage 3.1 sidebar sign-out: same single sign-out helper
+                // we use everywhere; clear Firebase + Google SDK +
+                // SessionCache, then bounce back to the role picker.
+                onSignOutRequested = {
+                    scope.launch {
+                        Session.signOut(authRepository, null)
+                    }
+                    navController.navigate(Routes.ROLE) {
+                        popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
             )
         }
 
@@ -283,14 +295,22 @@ fun AppNavigation() {
             SellerHomeScreen(
                 displayName = displayName,
                 email = email,
-                onAddProduct = { /* Stage 3.1 — product CRUD screen */ },
-                onManageOrders = { /* Stage 3.1 — orders mgmt screen */ },
-                onOpenInventory = { /* Stage 3.1 — inventory listing */ },
-                onOpenProduct = { /* Stage 3.1 — product detail */ },
-                onTabSelect = { tab -> onSellerTab(navController, tab) },
+                onAddProduct = { /* Stage 3.2.1 — product CRUD screen */ },
+                onManageOrders = { /* Stage 3.2.1 — orders mgmt screen */ },
+                onOpenInventory = { /* Stage 3.2.1 — inventory listing */ },
+                onOpenAnalytics = { /* Stage 3.2.1 — analytics screen */ },
+                onSwitchToBuyer = {
+                    // Switch to buyer app: keep the same Firebase session,
+                    // just flip the role expectation so the buyer dashboard
+                    // accepts the seller account too.
+                    navController.navigate(Routes.ROLE) {
+                        popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
                 onSignOut = {
                     scope.launch {
-                        Session.signOut(authRepository, null /* helper per-screen is reset on next login */)
+                        Session.signOut(authRepository, null)
                     }
                     navController.navigate(Routes.ROLE) {
                         popUpTo(0) { inclusive = true }
