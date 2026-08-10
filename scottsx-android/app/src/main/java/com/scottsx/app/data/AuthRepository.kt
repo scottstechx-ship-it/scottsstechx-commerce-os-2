@@ -7,6 +7,7 @@ import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.scottsx.app.data.domain.Role
+import com.scottsx.app.data.domain.SessionCache
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -49,7 +50,7 @@ class AuthRepository(
                 )
             }
             .getOrNull() ?: Role.Buyer
-        cacheRole(actualRole)
+        SessionCache.set(actualRole, user.displayName, user.email)
         // Enforce role separation: if the caller asked for a specific role
         // (they tapped "Login as Buyer" or "Login as Seller" at the role
         // selector) but the server says otherwise, hand back a RoleMismatch
@@ -114,7 +115,7 @@ class AuthRepository(
                 it,
             )
         }
-        cacheRole(role)
+        SessionCache.set(role, user.displayName, user.email)
         // Always return success — the Firebase Auth user is created
         // either way; the Firestore profile document can be back-filled
         // on next sign-in if Firestore was offline during registration.
@@ -153,7 +154,7 @@ class AuthRepository(
             .getOrNull()
 
         if (existingRole != null) {
-            cacheRole(existingRole)
+            SessionCache.set(existingRole, user.displayName, user.email)
             // Server-side role exists. Enforce separation — never let a
             // user pick a different role at the role selector and walk
             // through to the wrong dashboard. If the Firestore role
@@ -188,7 +189,7 @@ class AuthRepository(
                 it,
             )
         }
-        cacheRole(expectedRole)
+        SessionCache.set(expectedRole, displayName, email)
         // Note: we still return Success even if profileWrite failed.
         // The user is authenticated with Firebase Auth; the profile
         // document can be retried later. Blocking sign-in here
@@ -225,9 +226,6 @@ class AuthRepository(
         return if (raw.equals("seller", ignoreCase = true)) Role.Seller else Role.Buyer
     }
 
-    private fun cacheRole(role: Role) {
-        SessionCache.role = role
-    }
 }
 
 /**

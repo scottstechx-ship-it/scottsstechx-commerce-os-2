@@ -278,7 +278,14 @@ fun LoginScreen(
                             }.getOrElse { AuthResult.Failure(it.message ?: "Sign-in failed") }
                             loading = false
                             when (result) {
-                                is AuthResult.Success -> onLogin(result.role)
+                                is AuthResult.Success -> {
+                                    try {
+                                        onLogin(result.role)
+                                    } catch (t: Throwable) {
+                                        android.util.Log.e("LoginScreen", "post-login nav failed", t)
+                                        errorMsg = "Signed in, but the dashboard failed to load: ${t.message ?: t.javaClass.simpleName}"
+                                    }
+                                }
                                 is AuthResult.Failure -> errorMsg = result.message
                                 is AuthResult.RoleMismatch -> {
                                     errorMsg = "This email is registered as a ${result.actual.displayName}."
@@ -351,7 +358,14 @@ fun LoginScreen(
                             if (!stillActive) return@launch
                             loading = false
                             when (result) {
-                                is AuthResult.Success -> onSuccess(result.role)
+                                is AuthResult.Success -> {
+                                    try {
+                                        onSuccess(result.role)
+                                    } catch (t: Throwable) {
+                                        android.util.Log.e("LoginScreen", "post-google nav failed", t)
+                                        errorMsg = "Signed in, but the dashboard failed to load: ${t.message ?: t.javaClass.simpleName}"
+                                    }
+                                }
                                 is AuthResult.Failure -> errorMsg = result.message
                                 is AuthResult.RoleMismatch -> {
                                     errorMsg = "This Google account is registered as a ${result.actual.displayName}."

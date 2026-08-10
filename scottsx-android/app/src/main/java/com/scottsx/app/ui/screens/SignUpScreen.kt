@@ -381,7 +381,14 @@ fun SignUpScreen(
                             }.getOrElse { AuthResult.Failure(it.message ?: "Sign-up failed") }
                             loading = false
                             when (result) {
-                                is AuthResult.Success -> onSubmit(result.role)
+                                is AuthResult.Success -> {
+                                    try {
+                                        onSubmit(result.role)
+                                    } catch (t: Throwable) {
+                                        android.util.Log.e("SignUpScreen", "post-signup nav failed", t)
+                                        errorMsg = "Account created, but the dashboard failed to load: ${t.message ?: t.javaClass.simpleName}"
+                                    }
+                                }
                                 is AuthResult.Failure -> errorMsg = result.message
                                 is AuthResult.RoleMismatch -> {
                                     errorMsg = "This email is already registered as a ${result.actual.displayName}. Switching you there."

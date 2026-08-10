@@ -470,22 +470,38 @@ object Routes {
     fun signup(role: Role) = "signup/${role.name}"
     fun home(role: Role) = "home/${role.name}"
     fun wrongRole(picked: Role, actual: Role) = "wrongRole/${picked.name}/${actual.name}"
+    /**
+     * Build the dashboard route for the given [role]. Falls back to
+     * "Buyer" / "Seller" / a single non-empty placeholder when
+     * SessionCache fields are empty so the resulting path always
+     * matches the registered route shape
+     * `buyer_home/{displayName}/{email}` or
+     * `seller_home/{displayName}/{email}`.
+     *
+     * Without this guard, an empty display name / email yields
+     * `"buyer_home/Buyer/"` (trailing slash) which Navigation
+     * Compose rejects with IllegalArgumentException "cannot be
+     * found in the navigation graph".
+     */
     fun dashboard(role: Role): String = when (role) {
         Role.Buyer -> buyerHome(
             com.scottsx.app.data.domain.BuyerProfile(
                 uid = "",
                 displayName = SessionCache.displayName ?: "Buyer",
-                email = SessionCache.email ?: "",
+                email = SessionCache.email ?: "buyer",
             ),
         )
-        Role.Seller -> "${SELLER_HOME.replace(
-            "{displayName}",
-            java.net.URLEncoder.encode(SessionCache.displayName ?: "Seller", "UTF-8"),
-        ).replace(
-            "{email}",
-            java.net.URLEncoder.encode(SessionCache.email ?: "", "UTF-8"),
-        )}"
+        Role.Seller -> sellerHome(
+            displayName = SessionCache.displayName ?: "Seller",
+            email = SessionCache.email ?: "seller",
+        )
     }
+
+    fun sellerHome(displayName: String, email: String): String =
+        "seller_home/" +
+            java.net.URLEncoder.encode(displayName.ifBlank { "Seller" }, "UTF-8") +
+            "/" +
+            java.net.URLEncoder.encode(email.ifBlank { "seller" }, "UTF-8")
     fun buyerHome(profile: com.scottsx.app.data.domain.BuyerProfile) =
         "buyer_home/${profile.displayName}/" +
             java.net.URLEncoder.encode(profile.email, "UTF-8")

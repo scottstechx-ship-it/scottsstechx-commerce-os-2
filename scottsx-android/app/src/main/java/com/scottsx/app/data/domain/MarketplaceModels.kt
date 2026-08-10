@@ -130,9 +130,34 @@ enum class BenefitIcon { Delivery, Security, Returns, Protection }
  * Firebase on every nav. Cleared on sign-out.
  */
 object SessionCache {
-    var role: Role? = null
-    var displayName: String? = null
-    var email: String? = null
+    @Volatile var role: Role? = null
+    @Volatile var displayName: String? = null
+    @Volatile var email: String? = null
+
+    /**
+     * Atomically set the role + display name + email for the current
+     * session. Safe to call from any thread.
+     *
+     * Empty / null displayName is replaced with a non-empty placeholder
+     * ("Buyer" / "Seller" / "Google User") so route construction that
+     * uses [displayName] never produces a path with an empty segment
+     * (which Navigation Compose rejects with IllegalArgumentException
+     * "cannot be found in the navigation graph").
+     *
+     * Empty / null email is preserved as "" — the route argument
+     * already defaults to "" and the encoder encodes "" to "".
+     */
+    fun set(role: Role, displayName: String?, email: String?) {
+        this.role = role
+        this.displayName = when {
+            displayName.isNullOrBlank() -> when (role) {
+                Role.Seller -> "Seller"
+                Role.Buyer -> "Buyer"
+            }
+            else -> displayName
+        }
+        this.email = email ?: ""
+    }
 
     fun clear() {
         role = null
