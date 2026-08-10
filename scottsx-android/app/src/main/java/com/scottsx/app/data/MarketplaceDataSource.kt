@@ -433,4 +433,11 @@ object MarketplaceDataSource {
             isUnread = true,
         ),
     )
+
+    // ----- Sidebar badge counters -----
+    // Stage 3.1 placeholder counts. Once the backend lands, swap these
+    // for real Firestore queries (collections/users/{uid}/unreadCount).
+    fun unreadMessagesCount(): Int = 2
+    fun unreadNotificationsCount(): Int = notifications.count { it.isUnread }
+    fun pendingOrdersCount(): Int = 3
 }

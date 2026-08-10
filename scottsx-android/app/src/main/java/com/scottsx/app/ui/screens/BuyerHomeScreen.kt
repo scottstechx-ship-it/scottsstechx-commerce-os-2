@@ -43,8 +43,17 @@ import com.scottsx.app.data.CartStore
 import com.scottsx.app.data.MarketplaceDataSource
 import com.scottsx.app.data.domain.ProductCategory
 import com.scottsx.app.data.domain.BuyerProfile
-import com.scottsx.app.ui.components.BenefitsStrip
+import com.scottsx.app.data.preferences.ThemeMode
+import com.scottsx.app.data.preferences.ThemePreference
+import com.scottsx.app.data.preferences.themeState
+import com.scottsx.app.data.preferences.sidebarPaletteFor
+import com.scottsx.app.ui.components.BuyerSidebarOverlay
+import com.scottsx.app.ui.components.HamburgerIcon as Hamburger
+import com.scottsx.app.ui.components.SidebarDestination
+import com.scottsx.app.ui.components.ThemeSelectorSheet
+import com.scottsx.app.ui.components.LogoutConfirmDialog
 import com.scottsx.app.ui.components.BottomTab
+import com.scottsx.app.ui.components.BenefitsStrip
 import com.scottsx.app.ui.components.BuyerHeader
 import com.scottsx.app.ui.components.CountdownTimer
 import com.scottsx.app.ui.components.HeroCarousel
@@ -54,12 +63,15 @@ import com.scottsx.app.ui.components.ProductCard
 import com.scottsx.app.ui.components.ScottsTechXBottomBar
 import com.scottsx.app.ui.components.SectionTitle
 import com.scottsx.app.ui.theme.ScottsTechXColors
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material.icons.filled.Menu
 
 /**
- * Stage-2 Buyer Home Dashboard.
+ * Stage-2 Buyer Home Dashboard + Stage 3.1 sidebar overlay.
  *
  * Vertical hierarchy (per brief):
- *   1. Header
+ *   1. Header (with hamburger button overlaid for sidebar)
  *   2. Search + filter
  *   3. Hero carousel
  *   4. Category row
@@ -68,7 +80,11 @@ import com.scottsx.app.ui.theme.ScottsTechXColors
  *   7. Flash Deals (countdown + horizontal scroll)
  *   8. Recommended for you
  *   9. Floating transparent blue animated bottom nav
+ *  10. BuyerSidebar overlay (3.1)
+ *  11. Theme selector ModalBottomSheet (3.1)
+ *  12. Logout confirmation dialog (3.1)
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun BuyerHomeScreen(
     profile: BuyerProfile,
@@ -79,6 +95,7 @@ fun BuyerHomeScreen(
     onNavigateToAi: () -> Unit,
     onNavigateToAllProducts: () -> Unit,
     onTabSelect: (BottomTab) -> Unit,
+    onSignOutRequested: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val cartItems by CartStore.items.collectAsState()
@@ -86,6 +103,32 @@ fun BuyerHomeScreen(
 
     var selectedCategory by remember { mutableStateOf(ProductCategory.All) }
     var bottomTab by remember { mutableStateOf(BottomTab.Home) }
+
+    // --- Stage 3.1 sidebar overlay state ---
+    var sidebarOpen by remember { mutableStateOf(false) }
+    var themeSheetOpen by remember { mutableStateOf(false) }
+    var logoutDialogOpen by remember { mutableStateOf(false) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val themePref = remember(ctx) { ThemePreference.get(ctx) }
+    val themeMode by themePref.themeState()
+    val onSidebarNav: (SidebarDestination) -> Unit = { dest ->
+        when (dest) {
+            SidebarDestination.Home -> onTabSelect(BottomTab.Home)
+            SidebarDestination.Nearby -> onNavigateToNearby()
+            SidebarDestination.Ai -> onNavigateToAi()
+            SidebarDestination.Wishlist -> onTabSelect(BottomTab.Wishlist)
+            SidebarDestination.Cart -> onNavigateToCart()
+            SidebarDestination.Orders -> onNavigateToAllProducts()
+            SidebarDestination.Messages -> { /* TODO 3.1.1 — open Messages */ }
+            SidebarDestination.Notifications -> { /* TODO 3.1.1 — open Notifications */ }
+            SidebarDestination.SellerCenter -> { /* TODO 3.1.1 — seller dashboard */ }
+            SidebarDestination.BecomeSeller -> { /* TODO 3.1.1 — upgrade CTA */ }
+            SidebarDestination.Settings -> onTabSelect(BottomTab.Profile)
+            SidebarDestination.Theme -> themeSheetOpen = true
+            SidebarDestination.Logout -> logoutDialogOpen = true
+            SidebarDestination.Profile -> onTabSelect(BottomTab.Profile)
+        }
+    }
 
     Box(
         modifier = modifier
@@ -98,7 +141,8 @@ fun BuyerHomeScreen(
                 .padding(bottom = 88.dp),  // leave room for floating nav
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp),
         ) {
-            // 1. Header
+            // 1. Header — gradient backdrop with a hamburger button overlaid
+            //    in the top-left so the buyer can open the side drawer.
             item {
                 Box(
                     modifier = Modifier
@@ -121,6 +165,25 @@ fun BuyerHomeScreen(
                         onNotificationsClick = { /* Stage 2 — notifications */ },
                         onCartClick = onNavigateToCart,
                     )
+                    // Hamburger button (top-left). Anchored absolute on top of
+                    // the header so the dashboard layout below is untouched.
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(start = 12.dp, top = 6.dp)
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.18f))
+                            .clickable { sidebarOpen = true },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Menu,
+                            contentDescription = "Open menu",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
 
@@ -290,6 +353,55 @@ fun BuyerHomeScreen(
                 onSelect = { tab ->
                     bottomTab = tab
                     onTabSelect(tab)
+                },
+            )
+        }
+
+        // 10. Sidebar overlay (Stage 3.1). Always rendered but only
+        //     visible when [sidebarOpen] is true. Sits above the
+        //     bottom nav so tapping inside the drawer never reaches the
+        //     dashboard behind it.
+        BuyerSidebarOverlay(
+            open = sidebarOpen,
+            onDismiss = { sidebarOpen = false },
+            profile = profile,
+            cartCount = cartCount,
+            wishlistCount = 0,
+            onNavigate = { dest ->
+                onSidebarNav(dest)
+            },
+        )
+
+        // 11. Theme selector sheet — pinned at the bottom; tap any row
+        //     to apply + dismiss.
+        if (themeSheetOpen) {
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
+                onDismissRequest = { themeSheetOpen = false },
+                sheetState = sheetState,
+                containerColor = sidebarPaletteFor(themeMode).background,
+            ) {
+                ThemeSelectorSheet(
+                    current = themeMode,
+                    onPick = { mode ->
+                        themePref.set(mode)
+                        themeSheetOpen = false
+                    },
+                )
+            }
+        }
+
+        // 12. Logout confirmation dialog (Stage 3.1 brief).
+        if (logoutDialogOpen) {
+            LogoutConfirmDialog(
+                onCancel = { logoutDialogOpen = false },
+                onConfirm = {
+                    logoutDialogOpen = false
+                    sidebarOpen = false
+                    // Defer the actual sign-out to AppNavigation. We only
+                    // close the drawer here; the parent composable owns
+                    // auth state and decides where to navigate.
+                    onSignOutRequested()
                 },
             )
         }
