@@ -85,6 +85,7 @@ import com.scottsx.app.data.preferences.ThemePreference
 import com.scottsx.app.data.preferences.isSeller
 import com.scottsx.app.data.preferences.sidebarPaletteFor
 import com.scottsx.app.ui.theme.ScottsTechXColors
+import coil.compose.AsyncImage
 
 /** Destination of a sidebar nav item — opaque to the drawer. */
 enum class SidebarDestination {
@@ -234,13 +235,16 @@ fun BuyerSidebarCard(
         SidebarHeader(
             displayName = profile.displayName.ifBlank { "Guest" },
             email = profile.email,
+            avatarUrl = profile.avatarUrl,
             onClose = onDismiss,
         )
 
         // Scrollable body so small screens don't cut off options.
+        // Logout is now drawn in a sticky bottom bar OUTSIDE the LazyColumn
+        // so it's always visible at the bottom of the drawer.
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 8.dp),
         ) {
             item {
                 ProfileSection(
@@ -288,11 +292,16 @@ fun BuyerSidebarCard(
             itemsIndexed(prefItems) { index, item ->
                 SidebarRow(item, onClick = { onNavigate(item.destination) }, index = index)
             }
-            item {
-                Spacer(Modifier.height(20.dp))
-                LogOutRow(onClick = { onNavigate(SidebarDestination.Logout) })
-                Spacer(Modifier.height(8.dp))
-            }
+        }
+
+        // Sticky bottom bar — logout is always visible at the drawer bottom.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LogOutRow(onClick = { onNavigate(SidebarDestination.Logout) })
         }
     }
 }
@@ -301,6 +310,7 @@ fun BuyerSidebarCard(
 private fun SidebarHeader(
     displayName: String,
     email: String,
+    avatarUrl: String? = null,
     onClose: () -> Unit,
 ) {
     Row(
@@ -343,17 +353,29 @@ private fun SidebarHeader(
         Spacer(Modifier.weight(1f))
         Box(
             modifier = Modifier
-                .size(36.dp)
+                .size(40.dp)
                 .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.18f)),
+                .background(Color.White.copy(alpha = 0.18f))
+                .clickable(onClick = onClose),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = "SX",
-                color = Color.White,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 11.sp,
-            )
+            if (avatarUrl != null) {
+                coil.compose.AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = "Profile",
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape),
+                )
+            } else {
+                Text(
+                    text = displayName.firstOrNull()?.uppercase() ?: "U",
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 14.sp,
+                )
+            }
         }
     }
 }

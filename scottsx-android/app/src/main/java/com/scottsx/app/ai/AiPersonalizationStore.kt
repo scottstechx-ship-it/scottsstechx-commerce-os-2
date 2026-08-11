@@ -30,6 +30,12 @@ object AiPersonalizationStore {
     /** Whether personalization is enabled. The user can toggle this. */
     val enabled = mutableStateOf(true)
 
+    // Background coroutine for fire-and-forget backend signals.
+    private val personalisationScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+    )
+
+
     /** Categories the user frequently browses. Limited size. */
     val frequentCategories = mutableStateListOf<ProductCategory>()
 
@@ -67,8 +73,9 @@ object AiPersonalizationStore {
         frequentCategories.remove(category)
         frequentCategories.add(0, category)
         while (frequentCategories.size > maxList) frequentCategories.removeAt(frequentCategories.size - 1)
-    
+
         mirror()
+        personalisationScope.launch { com.scottsx.app.data.remote.V2Client.recordSignal("category", category.name) }
     }
 
     fun recordSearch(query: String, maxList: Int = 8) {
@@ -78,8 +85,9 @@ object AiPersonalizationStore {
         recentSearches.remove(q)
         recentSearches.add(0, q)
         while (recentSearches.size > maxList) recentSearches.removeAt(recentSearches.size - 1)
-    
+
         mirror()
+        personalisationScope.launch { com.scottsx.app.data.remote.V2Client.recordSignal("search", q) }
     }
 
     fun recordPrice(ugx: Long) {
@@ -95,8 +103,9 @@ object AiPersonalizationStore {
     fun recordFollow(sellerId: String) {
         if (!enabled.value) return
         if (!followedSellers.contains(sellerId)) followedSellers.add(sellerId)
-    
+
         mirror()
+        personalisationScope.launch { com.scottsx.app.data.remote.V2Client.recordSignal("seller", sellerId) }
     }
 
     fun recordUnfollow(sellerId: String) {

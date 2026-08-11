@@ -78,6 +78,7 @@ import com.scottsx.app.data.preferences.ThemeMode
 import com.scottsx.app.data.preferences.ThemePreference
 import com.scottsx.app.data.preferences.themeState
 import com.scottsx.app.ui.theme.ScottsTechXColors
+import coil.compose.AsyncImage
 
 /** What a seller sidebar tap wants to do. */
 enum class SellerSidebarDestination {
@@ -197,13 +198,14 @@ fun SellerSidebarCard(
             storeName = snapshot.storeName,
             displayName = snapshot.displayName,
             storeId = snapshot.storeId,
+            avatarUrl = SessionCache.avatarUrl,
             status = snapshot.status,
             onClose = onDismiss,
         )
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 8.dp),
         ) {
             item {
                 SellerProfileHeader(
@@ -292,20 +294,26 @@ fun SellerSidebarCard(
                 SellerSidebarRow(item, onClick = { onNavigate(item.destination) }, index = index)
             }
 
-            item {
-                Spacer(Modifier.height(16.dp))
-                SellerLogOutRow(onClick = { onNavigate(SellerSidebarDestination.Logout) })
-                Spacer(Modifier.height(8.dp))
-            }
         }
     }
 }
+
+        // Sticky bottom bar — logout is always visible at the drawer bottom.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SellerLogOutRow(onClick = { onNavigate(SellerSidebarDestination.Logout) })
+        }
 
 @Composable
 private fun SellerSidebarHeader(
     storeName: String,
     displayName: String,
     storeId: String,
+    avatarUrl: String? = null,
     status: com.scottsx.app.data.domain.StoreStatus,
     onClose: () -> Unit,
 ) {
@@ -348,17 +356,29 @@ private fun SellerSidebarHeader(
         Spacer(Modifier.weight(1f))
         Box(
             modifier = Modifier
-                .size(36.dp)
+                .size(40.dp)
                 .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.18f)),
+                .background(Color.White.copy(alpha = 0.18f))
+                .clickable(onClick = onClose),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = "SX",
-                color = Color.White,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 11.sp,
-            )
+            if (avatarUrl != null) {
+                coil.compose.AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = "Profile",
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape),
+                )
+            } else {
+                Text(
+                    text = storeName.firstOrNull()?.uppercase() ?: "S",
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 14.sp,
+                )
+            }
         }
     }
 }

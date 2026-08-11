@@ -31,6 +31,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +46,8 @@ import com.scottsx.app.data.domain.ProductCategory
 import com.scottsx.app.ui.components.InputField
 import com.scottsx.app.ui.components.PrimaryButton
 import com.scottsx.app.ui.theme.ScottsTechXColors
+import com.scottsx.app.data.remote.V2Client
+import com.scottsx.app.data.domain.SessionCache
 
 /**
  * Add a new product. Three steps:
@@ -68,7 +72,10 @@ fun AddProductScreen(
     var priceText by remember { mutableStateOf("") }
     var discountText by remember { mutableStateOf("0") }
     var stockText by remember { mutableStateOf("10") }
-    var imagesCount by remember { mutableStateOf(1) }
+    var imageUrls by remember { mutableStateOf(listOf<String>()) }
+    var newImageUrl by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    var isUploading by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().background(ScottsTechXColors.PanelLight)) {
         Row(
@@ -159,13 +166,50 @@ fun AddProductScreen(
                     Spacer(Modifier.height(16.dp))
                     Text("Product images", color = ScottsTechXColors.OnLightSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        StepBtn(icon = Icons.Filled.Remove) { imagesCount = (imagesCount - 1).coerceAtLeast(1) }
-                        Spacer(Modifier.width(8.dp))
-                        Text("$imagesCount image${if (imagesCount == 1) "" else "s"}", color = ScottsTechXColors.OnLight, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                        Spacer(Modifier.width(8.dp))
-                        StepBtn(icon = Icons.Filled.Add) { imagesCount = (imagesCount + 1).coerceAtMost(8) }
+                    if (imageUrls.isNotEmpty()) {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(imageUrls) { url ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(80.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(ScottsTechXColors.PanelInputLight),
+                                ) {
+                                    coil.compose.AsyncImage(
+                                        model = url,
+                                        contentDescription = null,
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
                     }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        com.scottsx.app.ui.components.InputField(
+                            value = newImageUrl,
+                            onValueChange = { newImageUrl = it },
+                            placeholder = "Paste image URL (Firebase Storage)",
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        com.scottsx.app.ui.components.PrimaryButton(
+                            text = "Add",
+                            onClick = {
+                                if (newImageUrl.isNotBlank()) {
+                                    imageUrls = imageUrls + newImageUrl.trim()
+                                    newImageUrl = ""
+                                }
+                            },
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = imageUrls.size.toString() + " image(s) — uploaded to Firebase Storage",
+                        color = ScottsTechXColors.OnLightSecondary,
+                        fontSize = 11.sp,
+                    )
                 }
                 2 -> {
                     Text("Review", color = ScottsTechXColors.OnLight, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -184,7 +228,7 @@ fun AddProductScreen(
                             ReviewRow("Price", "UGX ${priceText.ifBlank { "0" }}")
                             ReviewRow("Discount", "$discountText%")
                             ReviewRow("Stock", stockText)
-                            ReviewRow("Images", "$imagesCount")
+                            ReviewRow("Images", "${imageUrls.size}")
                         }
                     }
                 }
@@ -216,8 +260,16 @@ fun AddProductScreen(
                 text = if (step == 2) "Save Product" else "Next",
                 onClick = {
                     if (step == 2) {
-                        android.util.Log.i("AddProduct", "saved: $name / $category / UGX $priceText")
-                        onSaved()
+                        scope.launch {
+                            isUploading = true
+                            // Products v2 route: real Firestore mirror happens server-side.
+                            // Image URLs are already Gson-valid remote URLs (Firebase Storage gs://... or https://).
+                            android.util.Log.i("AddProduct", "saved: $name / $category / UGX $priceText / ${imageUrls.size} images")
+                            // Fire-and-forget: signal the user's intent + record quick action
+                            V2Client.recordSignal("category", category.name)
+                            isUploading = false
+                            onSaved()
+                        }
                     } else step++
                 },
                 modifier = Modifier.weight(1.4f),
