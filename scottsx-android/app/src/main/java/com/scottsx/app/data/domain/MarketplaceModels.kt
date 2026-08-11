@@ -163,14 +163,15 @@ object SessionCache {
      * already defaults to "" and the encoder encodes "" to "".
      */
     fun set(
-            role: Role,
-            displayName: String?,
-            email: String?,
-            userId: String? = null,
-            storeName: String? = null,
-            storeLocation: String? = null,
-            avatarUrl: String? = null,
-        ) {
+        role: Role,
+        displayName: String?,
+        email: String?,
+        userId: String? = null,
+        storeName: String? = null,
+        storeLocation: String? = null,
+        avatarUrl: String? = null,
+        firebaseUid: String? = null,
+    ) {
             this.role = role
             this.displayName = when {
                 displayName.isNullOrBlank() -> when (role) {
@@ -184,6 +185,7 @@ object SessionCache {
             this.storeName = storeName ?: this.storeName
             this.storeLocation = storeLocation ?: this.storeLocation
             this.avatarUrl = avatarUrl ?: this.avatarUrl
+            this.firebaseUid = firebaseUid ?: this.firebaseUid
         }
 
         fun clear() {
@@ -194,6 +196,7 @@ object SessionCache {
             storeName = null
             storeLocation = null
             avatarUrl = null
+            firebaseUid = null
         }
 
         fun userIdOrNull(): String? = userId
@@ -204,6 +207,7 @@ object SessionCache {
             else -> "ScottsTechX"
         }
         fun locationOrEmpty(): String = storeLocation ?: "Kampala"
+        fun firebaseUidOrNull(): String? = firebaseUid
     }
 // =====================================================================================
 // Seller domain models — Stage 3.2 seller dashboard.

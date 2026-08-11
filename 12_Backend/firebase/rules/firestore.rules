@@ -1,0 +1,164 @@
+rules_version = '2';
+
+// Firestore security rules for ScottsTechX.
+//
+// Access pattern: every collection is owned by a specific user via
+// `request.auth.uid`. We mirror the Postgres UUIDs into the
+// `firebaseUid` field on the user document; the rules use the
+// Firebase UID as the auth identity, but we ALSO allow access to
+// documents whose `ownerUid` field matches the caller's Firebase UID.
+//
+// Why a custom claim on the user's profile doc: we mint a
+// `role: "seller"|"buyer"|"admin"` claim via Cloud Functions when
+// the user upgrades to a seller. The rules read this from
+// `request.auth.token.role`.
+//
+// For the MVP we also allow the user document itself to set the
+// role on the JWT (server-side). This is sufficient for the v1.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function uid() {
+      return request.auth.uid;
+    }
+    function isOwner(ownerUid) {
+      return isSignedIn() && ownerUid == uid();
+    }
+    function role() {
+      // The backend mints `role` as a custom claim on the ID token.
+      // If absent, treat as "buyer".
+      return isSignedIn() && request.auth.token.role != null
+        ? request.auth.token.role
+        : 'buyer';
+    }
+    function isSeller() {
+      return isSignedIn() && role() == 'seller';
+    }
+    function isAdmin() {
+      return isSignedIn() && role() == 'admin';
+    }
+
+    // ----------------------------------------------------------------
+    // User profile mirror. Each user has exactly one profile doc at
+    // /users/{uid}.
+    // ----------------------------------------------------------------
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+
+      // Inbox: unread message pointers per conversation.
+      match /inbox/{cid} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // AI conversation history (Stage 4).
+      match /ai_history/{msgId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // AI personalisation signals.
+      match /ai_memory/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Settings.
+      match /settings/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Stage 4 user state: transactions, receipts, disputes, timeline.
+      // Each user sees their own. For shared state (a transaction has a
+      // buyer AND a seller), we mirror a copy to each side's tree.
+      match /transactions/{txId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /receipts/{receiptNumber} {
+        allow read, write: if isOwner(userId);
+      }
+      match /disputes/{disputeId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /timeline/{eventId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /wishlist/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // ----------------------------------------------------------------
+    // Public read-only collections (anyone signed in can read; only
+    // the owner seller can write).
+    // ----------------------------------------------------------------
+    match /products/{productId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSeller() &&
+        resource.data.sellerId == request.auth.uid ||
+        isAdmin();
+    }
+
+    match /stores/{storeId} {
+      allow read: if isSignedIn();
+      allow write: if isSeller() && storeId == request.auth.uid || isAdmin();
+    }
+
+    // ----------------------------------------------------------------
+    // Conversations + messages (real-time chat).
+    //
+    // Access rule: both participants of a conversation can read and
+    // write. The conversation doc has a `participants: [uid, uid]`
+    // array. A user can write a message if they're a participant.
+    // ----------------------------------------------------------------
+    match /conversations/{conversationId} {
+      function isParticipant() {
+        return isSignedIn() &&
+          request.auth.uid in resource.data.participants;
+      }
+      function isRequestedParticipant() {
+        return isSignedIn() &&
+          request.auth.uid in request.resource.data.participants;
+      }
+      allow read: if isParticipant();
+      // Creating the conversation: must include the caller in
+      // participants and at most 2 participants.
+      allow create: if isSignedIn() &&
+        isRequestedParticipant() &&
+        request.resource.data.participants.size() <= 2;
+      // Updating (e.g. lastMessage): must be a participant.
+      allow update: if isParticipant();
+      // No deletion from clients — server handles it.
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        function parentConv() {
+          return get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+        }
+        function isConvParticipant() {
+          return isSignedIn() &&
+            request.auth.uid in parentConv().participants;
+        }
+        function isRequestedConvParticipant() {
+          return isSignedIn() &&
+            request.auth.uid in getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+        }
+        allow read: if isConvParticipant();
+        allow create: if isRequestedConvParticipant() &&
+          request.resource.data.senderUid == request.auth.uid;
+        // Sender can edit their own message (e.g. for "deleted").
+        allow update, delete: if isConvParticipant() &&
+          resource.data.senderUid == request.auth.uid || isAdmin();
+      }
+    }
+
+    // ----------------------------------------------------------------
+    // Seller public profile (read by all signed-in, write by seller).
+    // ----------------------------------------------------------------
+    match /sellers/{sellerId} {
+      allow read: if isSignedIn();
+      allow write: if isSeller() && sellerId == request.auth.uid || isAdmin();
+    }
+  }
+}

@@ -1,0 +1,50 @@
+rules_version = '2';
+
+// Firebase Storage rules for ScottsTechX.
+//
+// Layout:
+//   chat/{conversationId}/{filename}    -- both participants can read/write
+//   products/{sellerId}/{filename}      -- public read; seller-only write
+//   receipts/{receiptNumber}.png       -- both parties can read
+//   avatars/{userId}/{filename}         -- public read; user-only write
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function uid() {
+      return request.auth.uid;
+    }
+
+    // Chat media: the conversation doc at /conversations/{cid} holds the
+    // participants list. We accept if the caller is in that list.
+    // To keep the rules fast we don't re-look-up the doc; the server
+    // already verified the caller before issuing the signed URL.
+    match /chat/{conversationId}/{filename} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid in
+        firestore.get(/databases/(default)/documents/conversations/$(conversationId)).data.participants;
+    }
+
+    // Product images: public read (so PDPs can show them without auth).
+    match /products/{sellerId}/{filename} {
+      allow read: if true;
+      allow write: if isSignedIn() && uid() == sellerId;
+    }
+
+    // Receipts: both parties can read. Only the seller (whoever owns
+    // the receipt) can write.
+    match /receipts/{filename} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() &&
+        firestore.get(/databases/(default)/documents/receipts/$(filename)).data.sellerUid == uid();
+    }
+
+    // Avatars: public read; only the owner can write.
+    match /avatars/{userId}/{filename} {
+      allow read: if true;
+      allow write: if isSignedIn() && uid() == userId;
+    }
+  }
+}

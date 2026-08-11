@@ -19,6 +19,7 @@ import com.scottsx.app.data.domain.TimelineEventType
 import com.scottsx.app.data.domain.TransactionAgreement
 import com.scottsx.app.data.domain.TransactionFactory
 import com.scottsx.app.data.domain.TransactionStatus
+import com.scottsx.app.data.firebase.Mirror
 
 /**
  * Stage 4 — Central store for transaction agreements, receipts,
@@ -103,6 +104,15 @@ object TransactionStore {
                 type = TimelineEventType.AGREEMENT_PROPOSED,
                 byRole = createdByRole,
             )
+        )
+        Mirror.transaction(ag)
+        Mirror.timelineEvent(
+            TimelineEvent(
+                transactionId = ag.id,
+                type = TimelineEventType.AGREEMENT_PROPOSED,
+                byRole = createdByRole,
+            ),
+            ag.id,
         )
         return ag
     }
@@ -223,6 +233,7 @@ object TransactionStore {
                 )
             )
         }
+        Mirror.transaction(updated)
         return updated
     }
 
@@ -240,6 +251,7 @@ object TransactionStore {
                 byRole = Role.SELLER,
             )
         )
+        Mirror.transaction(updated)
         return updated
     }
 
@@ -256,6 +268,7 @@ object TransactionStore {
                 byRole = Role.SELLER,
             )
         )
+        Mirror.transaction(updated)
         return updated
     }
 
@@ -277,6 +290,7 @@ object TransactionStore {
                 note = reason,
             )
         )
+        Mirror.transaction(updated)
         return updated
     }
 
@@ -343,6 +357,7 @@ object TransactionStore {
                 note = r.number,
             )
         )
+        Mirror.receipt(r)
         return r
     }
 
@@ -432,6 +447,7 @@ object TransactionStore {
                 )
             }
         }
+        Mirror.receipt(updated)
         return updated
     }
 
@@ -447,6 +463,7 @@ object TransactionStore {
             createdAt = System.currentTimeMillis(),
         )
         receipts.add(dup)
+        Mirror.receipt(dup)
         return dup
     }
 
@@ -486,6 +503,7 @@ object TransactionStore {
                 note = reason.label,
             )
         )
+        Mirror.dispute(d)
         return d
     }
 
@@ -516,6 +534,7 @@ object TransactionStore {
                 updatedAt = System.currentTimeMillis(),
             )
         }
+        Mirror.dispute(updated)
         return updated
     }
 

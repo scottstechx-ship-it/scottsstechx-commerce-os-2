@@ -4,6 +4,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import com.scottsx.app.data.domain.ProductCategory
 import com.scottsx.app.data.domain.Role
+import com.scottsx.app.data.firebase.Mirror
 
 /**
  * Stage 4 — Adaptive AI personalization store.
@@ -66,6 +67,8 @@ object AiPersonalizationStore {
         frequentCategories.remove(category)
         frequentCategories.add(0, category)
         while (frequentCategories.size > maxList) frequentCategories.removeAt(frequentCategories.size - 1)
+    
+        mirror()
     }
 
     fun recordSearch(query: String, maxList: Int = 8) {
@@ -75,6 +78,8 @@ object AiPersonalizationStore {
         recentSearches.remove(q)
         recentSearches.add(0, q)
         while (recentSearches.size > maxList) recentSearches.removeAt(recentSearches.size - 1)
+    
+        mirror()
     }
 
     fun recordPrice(ugx: Long) {
@@ -83,15 +88,21 @@ object AiPersonalizationStore {
         val high = preferredPriceHighUgx.value
         preferredPriceLowUgx.value = if (low == null) ugx else minOf(low, ugx)
         preferredPriceHighUgx.value = if (high == null) ugx else maxOf(high, ugx)
+    
+        mirror()
     }
 
     fun recordFollow(sellerId: String) {
         if (!enabled.value) return
         if (!followedSellers.contains(sellerId)) followedSellers.add(sellerId)
+    
+        mirror()
     }
 
     fun recordUnfollow(sellerId: String) {
         followedSellers.remove(sellerId)
+    
+        mirror()
     }
 
     fun recordSellerCategory(category: ProductCategory, maxList: Int = 4) {
@@ -99,6 +110,8 @@ object AiPersonalizationStore {
         sellerCategories.remove(category)
         sellerCategories.add(0, category)
         while (sellerCategories.size > maxList) sellerCategories.removeAt(sellerCategories.size - 1)
+    
+        mirror()
     }
 
     fun recordQuickAction(action: String) {
@@ -106,18 +119,26 @@ object AiPersonalizationStore {
         val map = quickActionCounts.value.toMutableMap()
         map[action] = (map[action] ?: 0) + 1
         quickActionCounts.value = map
+    
+        mirror()
     }
 
     fun recordAiOpened() {
         aiOpenedCount.value = aiOpenedCount.value + 1
+    
+        mirror()
     }
 
     fun recordLanguage(lang: String) {
         preferredLanguage.value = lang
+    
+        mirror()
     }
 
     fun recordTheme(theme: String) {
         themePreference.value = theme
+    
+        mirror()
     }
 
     // ----------------------------------------------------------------
@@ -127,6 +148,7 @@ object AiPersonalizationStore {
     fun setEnabled(v: Boolean) {
         enabled.value = v
         if (!v) clearMemory()
+        mirror()
     }
 
     fun clearMemory() {
@@ -138,6 +160,8 @@ object AiPersonalizationStore {
         sellerCategories.clear()
         quickActionCounts.value = emptyMap()
         // language / theme / aiOpenedCount are user-set preferences, not memory
+    }
+        mirror()
     }
 
     // ----------------------------------------------------------------
@@ -174,3 +198,15 @@ object AiPersonalizationStore {
         return if (sb.isEmpty()) "No personalization signals recorded yet." else sb.toString()
     }
 }
+
+    private fun mirror() {
+        Mirror.aiMemory(
+            recentSearches = recentSearches.toList(),
+            topCategories = frequentCategories.map { it.displayName },
+            followedSellers = followedSellers.toList(),
+            priceLowUgx = preferredPriceLowUgx.value,
+            priceHighUgx = preferredPriceHighUgx.value,
+            aiOpenCount = aiOpenedCount.value,
+        )
+    }
+

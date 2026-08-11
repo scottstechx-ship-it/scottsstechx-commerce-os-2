@@ -17,6 +17,10 @@ android-toolchain/
 *.jks
 *.keystore
 
+# Firebase Admin SDK service-account key (NEVER commit)
+**/secrets/firebase-admin-key.json
+**/secrets/
+
 # IDE / OS
 .vscode/
 .idea/
@@ -37,3 +41,6 @@ memory-kb-module/
 nextjs-starter/
 research-tools/
 company-website/
+
+# 12_Backend Firebase Admin SDK key (never commit)
+12_Backend/secrets/
