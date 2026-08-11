@@ -1,5 +1,7 @@
 package com.scottsx.app.ui.screens
 
+import com.scottsx.app.data.CartStore
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -50,6 +52,7 @@ import com.scottsx.app.ui.theme.ScottsTechXColors
 @Composable
 fun SearchScreen(
     onBack: () -> Unit,
+    onOpenProduct: (com.scottsx.app.data.domain.Product) -> Unit = {},
     onTabSelect: (BottomTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -206,8 +209,8 @@ fun SearchScreen(
                         ProductCard(
                             product = p,
                             width = 168.dp,
-                            onClick = { /* Stage 2 */ },
-                            onAddToCart = { /* Stage 2 */ },
+                            onClick = { onOpenProduct(p) },
+                            onAddToCart = { CartStore.add(p.id) },
                         )
                     }
                 }

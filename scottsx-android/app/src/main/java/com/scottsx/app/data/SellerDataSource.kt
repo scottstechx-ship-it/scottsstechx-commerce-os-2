@@ -30,8 +30,8 @@ object SellerDataSource {
     fun currentStatus(): StoreStatus = currentStatus
 
     fun snapshot(
-        displayName: String,
-        email: String,
+        displayName: String = "Fred Scotts",
+        email: String = "[email protected]",
     ): SellerDashboardSnapshot {
         return SellerDashboardSnapshot(
             displayName = displayName,

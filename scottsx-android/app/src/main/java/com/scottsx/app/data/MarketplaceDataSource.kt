@@ -6,10 +6,26 @@ import com.scottsx.app.data.domain.BenefitIcon
 import com.scottsx.app.data.domain.Brand
 import com.scottsx.app.data.domain.BuyerProfile
 import com.scottsx.app.data.domain.HeroBanner
+import com.scottsx.app.data.domain.DeliveryOption
+import com.scottsx.app.data.domain.Message
+import com.scottsx.app.data.domain.MessageThread
+import com.scottsx.app.data.domain.NearbySeller
 import com.scottsx.app.data.domain.Notification
 import com.scottsx.app.data.domain.Product
 import com.scottsx.app.data.domain.ProductCategory
+import com.scottsx.app.data.domain.ProductImage
+import com.scottsx.app.data.domain.ProductSpec
+import com.scottsx.app.data.domain.ProductVariant
+import com.scottsx.app.data.domain.RatingDistribution
+import com.scottsx.app.data.domain.Review
 import com.scottsx.app.data.domain.Seller
+import com.scottsx.app.data.domain.SellerCategoryRow
+import com.scottsx.app.data.domain.SellerStorefront
+import com.scottsx.app.data.domain.StockStatus
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * Stage-2 in-memory marketplace data source.
@@ -440,4 +456,316 @@ object MarketplaceDataSource {
     fun unreadMessagesCount(): Int = 2
     fun unreadNotificationsCount(): Int = notifications.count { it.isUnread }
     fun pendingOrdersCount(): Int = 3
+    // =====================================================================================
+    // Stage 3 — product augmentation + queries
+    // =====================================================================================
+
+    /** Standard variants, specs, nearby sellers, delivery for a product. */
+    private fun augment(base: Product): Product {
+        val colorVariants = if (base.id in productIdsWithColorVariants) listOf(
+            ProductVariant(id = "${base.id}-v-black", axis = "Color", value = "Black", stock = base.stock, imageIndex = 0),
+            ProductVariant(id = "${base.id}-v-blue", axis = "Color", value = "Blue", stock = (base.stock - 2).coerceAtLeast(0), imageIndex = 1),
+            ProductVariant(id = "${base.id}-v-white", axis = "Color", value = "White", stock = (base.stock - 1).coerceAtLeast(0), imageIndex = 2),
+        ) else emptyList()
+        val sizeVariants = if (base.id in productIdsWithSizeVariants) listOf(
+            ProductVariant(id = "${base.id}-v-s", axis = "Size", value = "S", stock = 4, priceDeltaUgx = 0),
+            ProductVariant(id = "${base.id}-v-m", axis = "Size", value = "M", stock = 7, priceDeltaUgx = 0),
+            ProductVariant(id = "${base.id}-v-l", axis = "Size", value = "L", stock = 5, priceDeltaUgx = 0),
+            ProductVariant(id = "${base.id}-v-xl", axis = "Size", value = "XL", stock = 2, priceDeltaUgx = 0),
+        ) else emptyList()
+        val storageVariants = if (base.id in productIdsWithStorageVariants) listOf(
+            ProductVariant(id = "${base.id}-v-128", axis = "Storage", value = "128GB", stock = 5, priceDeltaUgx = 0),
+            ProductVariant(id = "${base.id}-v-256", axis = "Storage", value = "256GB", stock = 3, priceDeltaUgx = 120_000),
+            ProductVariant(id = "${base.id}-v-512", axis = "Storage", value = "512GB", stock = 1, priceDeltaUgx = 280_000),
+        ) else emptyList()
+        val variants = colorVariants + sizeVariants + storageVariants
+        val images = (1..3).map { idx ->
+            ProductImage(id = "${base.id}-img-$idx", url = base.imageUrl, alt = "${base.name} - image $idx")
+        }
+        val specs = if (base.id in productIdsWithSpecs) listOf(
+            ProductSpec("Brand", base.brand.name),
+            ProductSpec("Category", base.category.displayName),
+            ProductSpec("Location", base.location),
+            ProductSpec("Seller", base.seller.name),
+            ProductSpec("Stock", "${base.stock} units"),
+            ProductSpec("Warranty", if (base.category == ProductCategory.Electronics) "1 Year" else "Seller Warranty"),
+        ) else emptyList()
+        val nearby = buildNearby(base)
+        val purchases = (base.ratingCount * 3).coerceAtLeast(10)
+        return base.copy(
+            images = images,
+            variants = variants,
+            specs = specs,
+            purchases = purchases,
+            wishlistCount = (base.ratingCount / 8).coerceAtLeast(2),
+        )
+    }
+
+    private val productIdsWithColorVariants = setOf(
+        "p-samsung-a15", "p-apple-iphone13", "p-hp-laptop", "p-nike-airmax",
+        "p-adidas-ultraboost", "p-newbalance-574", "p-hisense-tv", "p-vivo-y21",
+        "p-smartwatch", "p-headphones",
+    )
+    private val productIdsWithSizeVariants = setOf(
+        "p-nike-airmax", "p-adidas-ultraboost", "p-newbalance-574",
+    )
+    private val productIdsWithStorageVariants = setOf(
+        "p-samsung-a15", "p-apple-iphone13", "p-hp-laptop",
+    )
+    private val productIdsWithSpecs = setOf(
+        "p-samsung-a15", "p-apple-iphone13", "p-hp-laptop", "p-hisense-tv",
+        "p-vivo-y21", "p-smartwatch", "p-headphones",
+    )
+
+    /** Build a list of nearby sellers for a product. */
+    private fun buildNearby(p: Product): List<NearbySeller> {
+        val me = NearbySeller(
+            sellerId = p.seller.id,
+            productId = p.id,
+            sellerName = p.seller.name,
+            priceUgx = p.priceUgx,
+            distanceKm = if (p.seller.location == p.location) 1.8f else 3.5f,
+            deliveryDaysLabel = "1-3 days",
+            inStock = p.stock > 0,
+        )
+        val altSellers = sellersExcluding(p.seller.id).take(2).mapIndexed { idx, s ->
+            NearbySeller(
+                sellerId = s.id,
+                productId = "${p.id}-alt-$idx",
+                sellerName = s.name,
+                priceUgx = (p.priceUgx * (1.01f + idx * 0.012f)).toLong(),
+                distanceKm = 2.5f + idx * 1.4f,
+                deliveryDaysLabel = if (idx == 0) "1-3 days" else "3-5 days",
+                inStock = idx == 0,
+            )
+        }
+        return listOf(me) + altSellers
+    }
+
+    private fun sellersExcluding(id: String): List<Seller> =
+        listOf(sellerTechHub, sellerFashionHouse, sellerSneakerKing, sellerHomeAppliances,
+               sellerGlamour, sellerSporting, sellerPearlFresh, sellerAutoParts, sellerUgandaCrafts)
+            .filter { it.id != id }
+
+    // ----- Public query helpers -----
+
+    fun productById(productId: String): Product? = products.firstOrNull { it.id == productId }
+
+    fun productFull(productId: String): Product? = productById(productId)?.let { augment(it) }
+
+    fun variantsFor(productId: String): List<ProductVariant> = productFull(productId)?.variants.orEmpty()
+
+    fun stockStatusFor(product: Product): StockStatus = when {
+        product.stock <= 0 -> StockStatus.OutOfStock
+        product.stock <= 5 -> StockStatus.LowStock
+        else -> StockStatus.InStock
+    }
+
+    fun lowStockMessage(product: Product): String? = if (product.stock in 1..5) "Only ${product.stock} left" else null
+
+    fun nearbySellersFor(productId: String): List<NearbySeller> = productFull(productId)?.let { buildNearby(it) } ?: emptyList()
+
+    fun deliveryOptionsFor(productId: String): List<DeliveryOption> = productFull(productId)?.let {
+        listOf(
+            DeliveryOption(id = "${productId}-std", label = "Standard Delivery", etaDaysLabel = "1-3 days", feeUgx = if (it.priceUgx > 100_000) 5_000 else 2_000),
+            DeliveryOption(id = "${productId}-exp", label = "Express Delivery", etaDaysLabel = "Same day", feeUgx = 15_000),
+        )
+    } ?: emptyList()
+
+    fun topReviewsFor(productId: String, limit: Int = 3): List<Review> = reviewsFor(productId).take(limit)
+
+    fun reviewsFor(productId: String): List<Review> {
+        val p = products.firstOrNull { it.id == productId } ?: return emptyList()
+        val seed = (p.id.hashCode() and 0x7fffffff).toLong()
+        val rng = java.util.Random(seed)
+        val authors = listOf("Sarah K.", "David M.", "Achieng O.", "Brian N.", "Fatima A.", "Peter L.", "Joyce W.", "Daniel S.", "Rebecca T.", "Moses O.")
+        val bodies = listOf(
+            "Exactly as described. Delivery was fast and the packaging was solid.",
+            "Great value for the price. I have been using it daily and it works perfectly.",
+            "Solid build quality. The seller was responsive and shipped within a day.",
+            "Worth every shilling. The colour and finish look premium.",
+            "My second purchase from this store — happy customer so far!",
+            "Does the job. A bit smaller than I expected but still good.",
+            "Fast delivery to Kampala. Genuine product, sealed box.",
+            "The product is fine, the packaging could be better.",
+        )
+        val variants = p.variants.map { "${it.axis}: ${it.value}" }.ifEmpty { listOf(null) }
+        return (0 until (p.ratingCount.coerceAtMost(12))).map { idx ->
+            val rating = (3 + rng.nextInt(3)).coerceAtMost(5)
+            Review(
+                id = "${p.id}-r-$idx",
+                productId = p.id,
+                authorName = authors[idx % authors.size],
+                authorAvatarUrl = null,
+                rating = rating,
+                dateLabel = listOf("Just now", "2 days ago", "1 week ago", "2 weeks ago", "1 month ago", "2 months ago").let { it[idx % it.size] },
+                text = bodies[idx % bodies.size],
+                variantLabel = variants[idx % variants.size],
+                verifiedPurchase = idx % 3 != 0,
+            )
+        }
+    }
+
+    fun ratingDistributionFor(productId: String): RatingDistribution {
+        val reviews = reviewsFor(productId)
+        val dist = IntArray(6)
+        for (r in reviews) dist[r.rating.coerceIn(1, 5)]++
+        return RatingDistribution(five = dist[5], four = dist[4], three = dist[3], two = dist[2], one = dist[1])
+    }
+
+    fun similarProducts(productId: String, limit: Int = 6): List<Product> {
+        val p = productById(productId) ?: return emptyList()
+        return products.filter { it.id != productId && it.category == p.category }
+            .map { augment(it) }.take(limit)
+    }
+
+    fun recommendedProducts(productId: String?, limit: Int = 8): List<Product> =
+        products.filter { it.id != productId }
+            .sortedByDescending { it.rating * 1000 + it.ratingCount }
+            .map { augment(it) }.take(limit)
+
+    fun topReviewed(limit: Int = 12): List<Product> =
+        products.sortedByDescending { it.rating * 1000 + it.ratingCount }
+            .map { augment(it) }.take(limit)
+
+    fun topSelling(limit: Int = 5): List<Product> =
+        products.sortedByDescending { (it.oldPriceUgx ?: it.priceUgx) - it.priceUgx }
+            .map { augment(it) }.take(limit)
+
+    fun productsBySeller(sellerId: String): List<Product> =
+        products.filter { it.seller.id == sellerId }.map { augment(it) }
+
+    fun storefront(sellerId: String): SellerStorefront? {
+        val seller = products.map { it.seller }.firstOrNull { it.id == sellerId } ?: return null
+        val sellerProducts = productsBySeller(sellerId)
+        val reviews = sellerProducts.flatMap { reviewsFor(it.id) }
+        val cats = sellerProducts.groupBy { it.category }
+            .map { (cat, ps) -> SellerCategoryRow(cat, ps.size) }
+            .sortedByDescending { it.productCount }
+        return SellerStorefront(
+            seller = seller,
+            followers = (seller.id.hashCode() and 0x7fffffff) % 5000 + 200,
+            isFollowed = followedSellers.value.contains(sellerId),
+            description = "Premium ${seller.name} products delivered across Uganda. Quality guaranteed by ScottsTechX.",
+            location = seller.location,
+            productCount = sellerProducts.size,
+            rating = sellerProducts.map { it.rating }.average().toFloat().takeIf { !it.isNaN() } ?: 4.5f,
+            reviewCount = reviews.size,
+            responseRateLabel = "Usually responds within 1 hour",
+            products = sellerProducts,
+            categories = cats,
+            reviews = reviews.sortedByDescending { it.rating }.take(20),
+        )
+    }
+
+    fun storeReviews(sellerId: String): List<Review> =
+        productsBySeller(sellerId).flatMap { reviewsFor(it.id) }.sortedByDescending { it.rating }
+
+    // ----- Seller follow state -----
+    private val followedSellers = MutableStateFlow<Set<String>>(setOf("uganda-crafts"))
+    val followedSellersFlow: StateFlow<Set<String>> = followedSellers.asStateFlow()
+    fun toggleFollowSeller(sellerId: String): Boolean {
+        var nowFollowing = false
+        followedSellers.update { current ->
+            nowFollowing = !current.contains(sellerId)
+            if (nowFollowing) current + sellerId else current - sellerId
+        }
+        return nowFollowing
+    }
+    fun isFollowing(sellerId: String): Boolean = followedSellers.value.contains(sellerId)
+
+    // ----- Messages -----
+    private val _threads = MutableStateFlow<List<MessageThread>>(listOf(
+        MessageThread(
+            id = "thread-tech-hub-1",
+            sellerId = "tech-hub",
+            sellerName = "Tech Hub Uganda",
+            productId = "p-samsung-a15",
+            productName = "Samsung Galaxy A15",
+            lastMessage = "Sure, we have the black one in stock. Delivery tomorrow.",
+            lastTimeLabel = "2m ago",
+            unread = 1,
+        ),
+        MessageThread(
+            id = "thread-sneaker-king-1",
+            sellerId = "sneaker-king",
+            sellerName = "Sneaker King",
+            productId = "p-nike-airmax",
+            productName = "Nike Air Max 270",
+            lastMessage = "Yes size 42 is available. Order now?",
+            lastTimeLabel = "1h ago",
+            unread = 0,
+        ),
+    ))
+    val threadsFlow: StateFlow<List<MessageThread>> = _threads.asStateFlow()
+    private val _messages = MutableStateFlow<Map<String, List<Message>>>(
+        mapOf(
+            "thread-tech-hub-1" to listOf(
+                Message("m1", "u-buyer", "You", "Hi! Is the Samsung A15 still in stock?", "10:22 AM", isFromBuyer = true, productContextId = "p-samsung-a15"),
+                Message("m2", "tech-hub", "Tech Hub Uganda", "Yes, we have the black one. Would you like 128GB or 256GB?", "10:24 AM", isFromBuyer = false),
+                Message("m3", "u-buyer", "You", "128GB please. Can I pay on delivery?", "10:25 AM", isFromBuyer = true),
+                Message("m4", "tech-hub", "Tech Hub Uganda", "Sure, we have the black one in stock. Delivery tomorrow.", "10:27 AM", isFromBuyer = false),
+            ),
+            "thread-sneaker-king-1" to listOf(
+                Message("m5", "u-buyer", "You", "Are the Nike Air Max 270 in size 42?", "9:00 AM", isFromBuyer = true, productContextId = "p-nike-airmax"),
+                Message("m6", "sneaker-king", "Sneaker King", "Yes size 42 is available. Order now?", "9:10 AM", isFromBuyer = false),
+            ),
+        )
+    )
+
+    fun threadById(threadId: String): MessageThread? = _threads.value.firstOrNull { it.id == threadId }
+    fun threadsFor(sellerId: String): List<MessageThread> = _threads.value.filter { it.sellerId == sellerId }
+    fun messagesIn(threadId: String): List<Message> = _messages.value[threadId].orEmpty()
+
+    fun sendMessage(threadId: String, text: String, isFromBuyer: Boolean = true) {
+        val msg = Message(
+            id = "${threadId}-${System.currentTimeMillis()}",
+            senderId = if (isFromBuyer) "u-buyer" else threadId.split("-")[1],
+            senderName = if (isFromBuyer) "You" else (threadById(threadId)?.sellerName ?: "Seller"),
+            text = text,
+            timeLabel = "Now",
+            isFromBuyer = isFromBuyer,
+        )
+        _messages.update { it + (threadId to ((it[threadId].orEmpty()) + msg)) }
+        _threads.update { current ->
+            current.map { t -> if (t.id == threadId) t.copy(lastMessage = text, lastTimeLabel = "Now", unread = if (isFromBuyer) 0 else t.unread + 1) else t }
+        }
+    }
+
+    fun openThreadWith(sellerId: String, productId: String? = null): MessageThread {
+        val existing = _threads.value.firstOrNull { it.sellerId == sellerId && it.productId == productId }
+        if (existing != null) return existing
+        val seller = products.map { it.seller }.firstOrNull { it.id == sellerId }
+        val product = productId?.let { productById(it) }
+        val thread = MessageThread(
+            id = "thread-${sellerId}-${productId ?: "general"}-${System.currentTimeMillis()}",
+            sellerId = sellerId,
+            sellerName = seller?.name ?: "Seller",
+            productId = productId,
+            productName = product?.name,
+            lastMessage = "Started a new conversation.",
+            lastTimeLabel = "Now",
+            unread = 0,
+        )
+        _threads.update { it + thread }
+        if (!_messages.value.containsKey(thread.id)) {
+            _messages.update { it + (thread.id to emptyList()) }
+        }
+        return thread
+    }
+
+    fun searchProducts(query: String): List<Product> {
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) return products.map { augment(it) }
+        return products.filter { p ->
+            p.name.lowercase().contains(q) ||
+            p.description.lowercase().contains(q) ||
+            p.brand.name.lowercase().contains(q) ||
+            p.category.displayName.lowercase().contains(q) ||
+            p.seller.name.lowercase().contains(q)
+        }.map { augment(it) }
+    }
+
+    fun count(): Int = products.size
+
 }

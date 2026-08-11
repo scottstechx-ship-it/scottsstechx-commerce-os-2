@@ -94,6 +94,8 @@ fun BuyerHomeScreen(
     onNavigateToNearby: () -> Unit,
     onNavigateToAi: () -> Unit,
     onNavigateToAllProducts: () -> Unit,
+    onOpenProduct: (com.scottsx.app.data.domain.Product) -> Unit = {},
+    onOpenStore: (String) -> Unit = {},
     onTabSelect: (BottomTab) -> Unit,
     onSignOutRequested: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -301,7 +303,7 @@ fun BuyerHomeScreen(
                     items(MarketplaceDataSource.flashDeals, key = { it.id }) { product ->
                         ProductCard(
                             product = product,
-                            onClick = { /* Stage 2 — product details */ },
+                            onClick = { onOpenProduct(product) },
                             onAddToCart = { CartStore.add(product.id) },
                         )
                     }
@@ -342,7 +344,24 @@ fun BuyerHomeScreen(
             }
         }
 
-        // 9. Floating bottom nav
+        // 10. Sidebar overlay (Stage 3.1). Always rendered but only
+        //     visible when [sidebarOpen] is true. The bottom nav is
+        //     drawn AFTER the overlay so the user can still tap Home
+        //     / Nearby / AI / Wishlist / Profile even when the drawer
+        //     is open — the drawer never covers the bottom nav.
+        BuyerSidebarOverlay(
+            open = sidebarOpen,
+            onDismiss = { sidebarOpen = false },
+            profile = profile,
+            cartCount = cartCount,
+            wishlistCount = 0,
+            onNavigate = { dest ->
+                onSidebarNav(dest)
+            },
+        )
+
+        // 9. Floating bottom nav — rendered LAST so the sidebar
+        //     overlay never covers it.
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -356,21 +375,6 @@ fun BuyerHomeScreen(
                 },
             )
         }
-
-        // 10. Sidebar overlay (Stage 3.1). Always rendered but only
-        //     visible when [sidebarOpen] is true. Sits above the
-        //     bottom nav so tapping inside the drawer never reaches the
-        //     dashboard behind it.
-        BuyerSidebarOverlay(
-            open = sidebarOpen,
-            onDismiss = { sidebarOpen = false },
-            profile = profile,
-            cartCount = cartCount,
-            wishlistCount = 0,
-            onNavigate = { dest ->
-                onSidebarNav(dest)
-            },
-        )
 
         // 11. Theme selector sheet — pinned at the bottom; tap any row
         //     to apply + dismiss.

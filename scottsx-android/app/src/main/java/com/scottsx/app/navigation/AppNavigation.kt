@@ -29,12 +29,24 @@ import com.scottsx.app.ui.screens.OnboardingFlow
 import com.scottsx.app.ui.screens.ProfileScreen
 import com.scottsx.app.ui.screens.RoleSelectionScreen
 import com.scottsx.app.ui.screens.SearchScreen
+import com.scottsx.app.ui.screens.AddProductScreen
+import com.scottsx.app.ui.screens.MarketplaceToolsScreen
+import com.scottsx.app.ui.screens.MessageThreadScreen
+import com.scottsx.app.ui.screens.ProductDetailScreen
+import com.scottsx.app.ui.screens.ProfileSettingsScreen
+import com.scottsx.app.ui.screens.ReviewsScreen
+import com.scottsx.app.ui.screens.SellerAnalyticsScreen
 import com.scottsx.app.ui.screens.SellerHomeScreen
+import com.scottsx.app.ui.screens.SellerMessagesScreen
+import com.scottsx.app.ui.screens.SellerOrdersScreen
+import com.scottsx.app.ui.screens.SellerStorefrontScreen
 import com.scottsx.app.ui.screens.SignUpScreen
 import com.scottsx.app.ui.screens.SplashScreen
+import com.scottsx.app.ui.screens.StoreSettingsScreen
 import com.scottsx.app.ui.screens.WishlistScreen
 import com.scottsx.app.ui.screens.WrongRoleScreen
 import kotlinx.coroutines.launch
+import java.net.URLEncoder
 
 /**
  * Stage-3 navigation host.
@@ -254,6 +266,8 @@ fun AppNavigation() {
                 onNavigateToNearby = { navController.navigate(Routes.NEARBY) },
                 onNavigateToAi = { navController.navigate(Routes.AI) },
                 onNavigateToAllProducts = { navController.navigate(Routes.CATEGORIES) },
+                onOpenProduct = { p -> navController.navigate(Routes.product(p.id)) },
+                onOpenStore = { sid -> navController.navigate(Routes.storefront(sid)) },
                 onTabSelect = { tab -> onBuyerTab(navController, tab) },
                 // Stage 3.1 sidebar sign-out: same single sign-out helper
                 // we use everywhere; clear Firebase + Google SDK +
@@ -295,10 +309,15 @@ fun AppNavigation() {
             SellerHomeScreen(
                 displayName = displayName,
                 email = email,
-                onAddProduct = { /* Stage 3.2.1 — product CRUD screen */ },
-                onManageOrders = { /* Stage 3.2.1 — orders mgmt screen */ },
-                onOpenInventory = { /* Stage 3.2.1 — inventory listing */ },
-                onOpenAnalytics = { /* Stage 3.2.1 — analytics screen */ },
+                onAddProduct = { navController.navigate(Routes.SELLER_ADD_PRODUCT) },
+                onManageOrders = { navController.navigate(Routes.SELLER_ORDERS) },
+                onOpenInventory = { navController.navigate(Routes.SELLER_ORDERS) },
+                onOpenAnalytics = { navController.navigate(Routes.SELLER_ANALYTICS) },
+                onOpenMarketplaceTools = { navController.navigate(Routes.SELLER_TOOLS) },
+                onOpenStoreSettings = { navController.navigate(Routes.SELLER_STORE_SETTINGS) },
+                onOpenProfileSettings = { navController.navigate(Routes.SELLER_PROFILE_SETTINGS) },
+                onOpenMessages = { navController.navigate(Routes.SELLER_MESSAGES) },
+                onOpenProduct = { product -> navController.navigate(Routes.product(product.id)) },
                 onSwitchToBuyer = {
                     // Switch to buyer app: keep the same Firebase session,
                     // just flip the role expectation so the buyer dashboard
@@ -335,24 +354,28 @@ fun AppNavigation() {
         composable(Routes.AI) {
             AiAssistantScreen(
                 onBack = { navController.popBackStack() },
+                onOpenProduct = { p -> navController.navigate(Routes.product(p.id)) },
                 onTabSelect = { tab -> onBuyerTab(navController, tab) },
             )
         }
         composable(Routes.SEARCH) {
             SearchScreen(
                 onBack = { navController.popBackStack() },
+                onOpenProduct = { p -> navController.navigate(Routes.product(p.id)) },
                 onTabSelect = { tab -> onBuyerTab(navController, tab) },
             )
         }
         composable(Routes.CATEGORIES) {
             CategoriesScreen(
                 onBack = { navController.popBackStack() },
+                onOpenProduct = { p -> navController.navigate(Routes.product(p.id)) },
                 onTabSelect = { tab -> onBuyerTab(navController, tab) },
             )
         }
         composable(Routes.WISHLIST) {
             WishlistScreen(
                 onBack = { navController.popBackStack() },
+                onOpenProduct = { p -> navController.navigate(Routes.product(p.id)) },
                 onTabSelect = { tab -> onBuyerTab(navController, tab) },
             )
         }
@@ -380,9 +403,6 @@ fun AppNavigation() {
                         launchSingleTop = true
                     }
                 },
-                // Switch account: same as sign-out but we additionally
-                // tell the Google SDK to clear its cached token so the
-                // next tap forces the system account picker.
                 onSwitchAccount = {
                     try {
                         (activityContext as? android.app.Activity)?.let { activity ->
@@ -399,6 +419,99 @@ fun AppNavigation() {
                     }
                 },
             )
+        }
+        // =====================================================================
+        // Stage 3 — Product discovery + seller storefront + messaging
+        // =====================================================================
+
+        composable(
+            Routes.PRODUCT,
+            arguments = listOf(navArgument("productId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val productId = backStackEntry.arguments?.getString("productId").orEmpty()
+            ProductDetailScreen(
+                productId = productId,
+                onBack = { navController.popBackStack() },
+                onViewSeller = { sid -> navController.navigate(Routes.storefront(sid)) },
+                onMessageSeller = { sid, pid -> navController.navigate(Routes.thread(sid, pid)) },
+                onViewAllReviews = { pid -> navController.navigate(Routes.reviews(pid)) },
+                onOpenCart = { navController.navigate(Routes.CART) },
+                onOpenNearby = { pid -> navController.navigate(Routes.NEARBY) },
+                onOpenAi = { navController.navigate(Routes.AI) },
+                onOpenProduct = { pid -> navController.navigate(Routes.product(pid)) },
+            )
+        }
+
+        composable(
+            Routes.STOREFRONT,
+            arguments = listOf(navArgument("sellerId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val sellerId = backStackEntry.arguments?.getString("sellerId").orEmpty()
+            SellerStorefrontScreen(
+                sellerId = sellerId,
+                onBack = { navController.popBackStack() },
+                onOpenProduct = { pid -> navController.navigate(Routes.product(pid)) },
+                onMessageSeller = { sid, pid -> navController.navigate(Routes.thread(sid, pid)) },
+                onViewAllReviews = { pid -> navController.navigate(Routes.reviews(pid)) },
+            )
+        }
+
+        composable(
+            Routes.REVIEWS,
+            arguments = listOf(navArgument("productId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val pid = backStackEntry.arguments?.getString("productId").orEmpty()
+            ReviewsScreen(productId = pid, onBack = { navController.popBackStack() })
+        }
+
+        composable(
+            Routes.THREAD,
+            arguments = listOf(
+                navArgument("sellerId") { type = NavType.StringType },
+                navArgument("productId") { type = NavType.StringType; defaultValue = "" },
+            ),
+        ) { backStackEntry ->
+            val sid = backStackEntry.arguments?.getString("sellerId").orEmpty()
+            val pid = backStackEntry.arguments?.getString("productId").orEmpty().ifBlank { null }
+            MessageThreadScreen(
+                sellerId = sid,
+                productId = pid,
+                onBack = { navController.popBackStack() },
+                onOpenProduct = { id -> navController.navigate(Routes.product(id)) },
+                onViewStore = { id -> navController.navigate(Routes.storefront(id)) },
+            )
+        }
+
+        // =====================================================================
+        // Stage 3 — Seller side screens
+        // =====================================================================
+
+        composable(Routes.SELLER_ORDERS) {
+            SellerOrdersScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SELLER_ADD_PRODUCT) {
+            AddProductScreen(
+                onBack = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.SELLER_MESSAGES) {
+            SellerMessagesScreen(
+                onBack = { navController.popBackStack() },
+                onOpenThread = { threadId -> navController.navigate(Routes.thread("tech-hub", null)) },
+            )
+        }
+        composable(Routes.SELLER_ANALYTICS) {
+            SellerAnalyticsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SELLER_TOOLS) {
+            MarketplaceToolsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SELLER_STORE_SETTINGS) {
+            StoreSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SELLER_PROFILE_SETTINGS) {
+            ProfileSettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 
@@ -485,6 +598,26 @@ object Routes {
     const val CATEGORIES = "categories"
     const val WISHLIST = "wishlist"
     const val PROFILE = "profile/{displayName}/{email}"
+
+    // ---- Stage 3 product discovery routes ----
+    const val PRODUCT = "product/{productId}"
+    const val STOREFRONT = "storefront/{sellerId}"
+    const val REVIEWS = "reviews/{productId}"
+    const val THREAD = "thread/{sellerId}/{productId}"
+    // ---- Stage 3 seller side routes ----
+    const val SELLER_ORDERS = "seller/orders"
+    const val SELLER_ADD_PRODUCT = "seller/add-product"
+    const val SELLER_MESSAGES = "seller/messages"
+    const val SELLER_ANALYTICS = "seller/analytics"
+    const val SELLER_TOOLS = "seller/marketplace-tools"
+    const val SELLER_STORE_SETTINGS = "seller/store-settings"
+    const val SELLER_PROFILE_SETTINGS = "seller/profile-settings"
+
+    fun product(id: String) = "product/${URLEncoder.encode(id, "UTF-8")}"
+    fun storefront(id: String) = "storefront/${URLEncoder.encode(id, "UTF-8")}"
+    fun reviews(id: String) = "reviews/${URLEncoder.encode(id, "UTF-8")}"
+    fun thread(sellerId: String, productId: String? = null) =
+        "thread/${URLEncoder.encode(sellerId, "UTF-8")}/${URLEncoder.encode(productId ?: "", "UTF-8")}"
 
     fun login(role: Role) = "login/${role.name}"
     fun signup(role: Role) = "signup/${role.name}"

@@ -114,6 +114,10 @@ fun SellerHomeScreen(
     onManageOrders: () -> Unit = {},
     onOpenInventory: () -> Unit = {},
     onOpenAnalytics: () -> Unit = {},
+    onOpenMarketplaceTools: () -> Unit = {},
+    onOpenStoreSettings: () -> Unit = {},
+    onOpenProfileSettings: () -> Unit = {},
+    onOpenMessages: () -> Unit = {},
     onOpenProduct: (com.scottsx.app.data.domain.Product) -> Unit = {},
     onSwitchToBuyer: () -> Unit = {},
     onSignOut: () -> Unit = {},
@@ -260,13 +264,13 @@ fun SellerHomeScreen(
                     SellerSidebarDestination.Orders -> onManageOrders()
                     SellerSidebarDestination.Products -> onOpenInventory()
                     SellerSidebarDestination.Customers -> Unit
-                    SellerSidebarDestination.Messages -> Unit
-                    SellerSidebarDestination.Promotions -> Unit
+                    SellerSidebarDestination.Messages -> onOpenMessages()
+                    SellerSidebarDestination.Promotions -> onOpenMarketplaceTools()
                     SellerSidebarDestination.Analytics -> onOpenAnalytics()
-                    SellerSidebarDestination.SellerAi -> Unit
-                    SellerSidebarDestination.MarketingTools -> Unit
-                    SellerSidebarDestination.StoreProfile -> Unit
-                    SellerSidebarDestination.StoreSettings -> Unit
+                    SellerSidebarDestination.SellerAi -> onOpenAnalytics()
+                    SellerSidebarDestination.MarketingTools -> onOpenMarketplaceTools()
+                    SellerSidebarDestination.StoreProfile -> onOpenStoreSettings()
+                    SellerSidebarDestination.StoreSettings -> onOpenStoreSettings()
                     SellerSidebarDestination.SwitchToBuyer -> onSwitchToBuyer()
                     SellerSidebarDestination.Logout -> logoutDialogOpen = true
                     SellerSidebarDestination.ViewStore -> Unit

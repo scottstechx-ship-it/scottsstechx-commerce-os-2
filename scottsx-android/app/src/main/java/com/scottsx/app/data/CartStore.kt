@@ -19,28 +19,40 @@ object CartStore {
     private val _items = MutableStateFlow<List<CartItem>>(emptyList())
     val items: StateFlow<List<CartItem>> = _items.asStateFlow()
 
-    fun add(productId: String, quantity: Int = 1) {
+    /**
+     * Add a product (with optional variant) to the cart. If a cart
+     * line already exists for the same product+variant, the quantities
+     * merge. Returns the new total cart count so the UI can show a
+     * "+1" toast.
+     */
+    fun add(productId: String, quantity: Int = 1, variantId: String? = null): Int {
         _items.update { current ->
-            val existing = current.firstOrNull { it.productId == productId }
+            val existing = current.firstOrNull { it.productId == productId && it.variantId == variantId }
             if (existing != null) {
                 current.map {
-                    if (it.productId == productId) it.copy(quantity = it.quantity + quantity)
+                    if (it.productId == productId && it.variantId == variantId)
+                        it.copy(quantity = it.quantity + quantity)
                     else it
                 }
             } else {
-                current + CartItem(productId, quantity)
+                current + CartItem(productId, quantity, variantId)
             }
+        }
+        return _items.value.sumOf { it.quantity }
+    }
+
+    fun remove(productId: String, variantId: String? = null) {
+        _items.update { current ->
+            current.filterNot { it.productId == productId && it.variantId == variantId }
         }
     }
 
-    fun remove(productId: String) {
-        _items.update { current -> current.filterNot { it.productId == productId } }
-    }
-
-    fun setQuantity(productId: String, quantity: Int) {
-        if (quantity <= 0) { remove(productId); return }
+    fun setQuantity(productId: String, quantity: Int, variantId: String? = null) {
+        if (quantity <= 0) { remove(productId, variantId); return }
         _items.update { current ->
-            current.map { if (it.productId == productId) it.copy(quantity = quantity) else it }
+            current.map {
+                if (it.productId == productId && it.variantId == variantId) it.copy(quantity = quantity) else it
+            }
         }
     }
 
@@ -79,4 +91,20 @@ fun List<CartItem>.resolve(): List<Pair<Product, Int>> =
     mapNotNull { item ->
         val product = MarketplaceDataSource.allProducts.firstOrNull { it.id == item.productId }
         product?.let { it to item.quantity }
+    }
+
+/**
+ * Variant-aware cart resolver. Same as [resolve] but keeps the
+ * variantId so the cart screen can render "Color: Black" etc.
+ */
+data class ResolvedCartItem(
+    val product: Product,
+    val quantity: Int,
+    val variantId: String? = null,
+)
+
+fun List<CartItem>.resolveWithVariants(): List<ResolvedCartItem> =
+    mapNotNull { item ->
+        val product = MarketplaceDataSource.allProducts.firstOrNull { it.id == item.productId }
+        product?.let { ResolvedCartItem(it, item.quantity, item.variantId) }
     }

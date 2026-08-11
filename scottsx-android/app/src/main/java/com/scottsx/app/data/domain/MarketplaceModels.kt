@@ -71,6 +71,13 @@ data class Product(
     val isFlashDeal: Boolean = false,
     val discountPercent: Int = 0,
     val location: String = "Kampala",
+    // ---- Stage 3 additions (all defaulted so existing call sites
+    // keep compiling) ----
+    val images: List<ProductImage> = listOf(ProductImage(id = "$id-img-0", url = imageUrl, alt = name)),
+    val variants: List<ProductVariant> = emptyList(),
+    val specs: List<ProductSpec> = emptyList(),
+    val purchases: Int = 0,
+    val wishlistCount: Int = 0,
 )
 
 data class HeroBanner(
@@ -92,6 +99,10 @@ sealed class BannerBackground {
 data class CartItem(
     val productId: String,
     val quantity: Int = 1,
+    // Stage 3 — optional variant id (color, size, storage, ...).
+    // The Cart store dedupes by (productId, variantId) so two variants
+    // of the same product become two cart lines.
+    val variantId: String? = null,
 )
 
 data class WishlistItem(
@@ -256,4 +267,170 @@ data class SellerDashboardSnapshot(
     val sales: List<SalesPoint>,
     val aiInsight: SellerAiInsight,
     val lowStock: List<LowStockAlert>,
+)
+
+
+// =====================================================================================
+// Stage 3 — product discovery, variants, reviews, storefront, messages
+// =====================================================================================
+
+/**
+ * One image of a product. The PDP gallery displays the first image
+ * as the main hero; subsequent images are thumbnails that swap on tap
+ * or swipe.
+ */
+data class ProductImage(
+    val id: String,
+    val url: String,
+    val alt: String = "",
+)
+
+/**
+ * A purchasable variant of a product. The Stage 3 brief calls out
+ * color / size / storage buckets but the model stays generic so
+ * any axis is possible (RAM, material, etc.).
+ */
+data class ProductVariant(
+    val id: String,
+    val axis: String,           // "Color", "Size", "Storage", ...
+    val value: String,          // "Black", "256GB", ...
+    val priceDeltaUgx: Long = 0, // added on top of [Product.priceUgx]
+    val stock: Int,
+    val imageIndex: Int? = null, // when selected, gallery shows this image
+    val sku: String? = null,
+)
+
+/** A single row in the product specifications table. */
+data class ProductSpec(
+    val key: String,
+    val value: String,
+)
+
+/** A buyer-submitted review for a product. */
+data class Review(
+    val id: String,
+    val productId: String,
+    val authorName: String,
+    val authorAvatarUrl: String? = null,
+    val rating: Int,                    // 1..5
+    val dateLabel: String,              // e.g. "2 weeks ago"
+    val text: String,
+    val variantLabel: String? = null,   // "Black / 256GB" if buyer specifies
+    val verifiedPurchase: Boolean = false,
+)
+
+/** Distribution of ratings for the chart on the PDP / Reviews screen. */
+data class RatingDistribution(
+    val five: Int,
+    val four: Int,
+    val three: Int,
+    val two: Int,
+    val one: Int,
+) {
+    val total: Int get() = five + four + three + two + one
+    fun percent(stars: Int): Float = if (total == 0) 0f else when (stars) {
+        5 -> five / total.toFloat()
+        4 -> four / total.toFloat()
+        3 -> three / total.toFloat()
+        2 -> two / total.toFloat()
+        1 -> one / total.toFloat()
+        else -> 0f
+    }
+}
+
+/** Stock availability for the PDP. */
+enum class StockStatus { InStock, LowStock, OutOfStock }
+
+/** Delivery method offered by a single seller. */
+data class DeliveryOption(
+    val id: String,
+    val label: String,           // "Standard Delivery" / "Express"
+    val etaDaysLabel: String,     // "1-3 days" / "Same day"
+    val feeUgx: Long,
+)
+
+/** A single nearby-sellers row shown on the PDP. */
+data class NearbySeller(
+    val sellerId: String,
+    val productId: String,        // may be the same productId or a sibling SKU
+    val sellerName: String,
+    val priceUgx: Long,
+    val distanceKm: Float,
+    val deliveryDaysLabel: String,
+    val inStock: Boolean,
+)
+
+/** A single message inside a buyer↔seller thread. */
+data class Message(
+    val id: String,
+    val senderId: String,
+    val senderName: String,
+    val text: String,
+    val timeLabel: String,         // "10:30 AM"
+    val isFromBuyer: Boolean,
+    val productContextId: String? = null, // PDP auto-attached product
+)
+
+/** A buyer↔seller conversation. */
+data class MessageThread(
+    val id: String,
+    val sellerId: String,
+    val sellerName: String,
+    val productId: String? = null,
+    val productName: String? = null,
+    val lastMessage: String,
+    val lastTimeLabel: String,
+    val unread: Int = 0,
+)
+
+/** Tabs on the seller's public storefront. */
+enum class StorefrontTab(val label: String) {
+    Products("Products"),
+    Categories("Categories"),
+    Reviews("Reviews"),
+    About("About"),
+}
+
+/** A category entry shown under the "Categories" tab of a storefront. */
+data class SellerCategoryRow(
+    val category: ProductCategory,
+    val productCount: Int,
+)
+
+/** Extended product with all Stage 3 fields. Backwards compatible. */
+data class ProductFull(
+    val product: Product,
+    val images: List<ProductImage>,
+    val variants: List<ProductVariant>,
+    val specs: List<ProductSpec>,
+    val purchases: Int = 0,                 // "X sold"
+    val wishlistCount: Int = 0,
+    val nearby: List<NearbySeller> = emptyList(),
+    val delivery: List<DeliveryOption> = emptyList(),
+) {
+    val id: String get() = product.id
+    val displayImage: ProductImage
+        get() = images.firstOrNull() ?: ProductImage(
+            id = "${product.id}-fallback",
+            url = product.imageUrl,
+            alt = product.name,
+        )
+}
+
+/** Aggregated storefront data for the public view. */
+data class SellerStorefront(
+    val seller: Seller,
+    val followers: Int,
+    val isFollowed: Boolean,
+    val description: String,
+    val location: String,
+    val productCount: Int,
+    val rating: Float,
+    val reviewCount: Int,
+    val responseRateLabel: String,
+    val products: List<Product>,
+    val categories: List<SellerCategoryRow>,
+    val reviews: List<Review>,
+    val verified: Boolean = true,
+    val joinedLabel: String = "Joined March 2024",
 )
