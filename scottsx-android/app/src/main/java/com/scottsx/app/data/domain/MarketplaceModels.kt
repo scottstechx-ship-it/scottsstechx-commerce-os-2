@@ -10,17 +10,17 @@ package com.scottsx.app.data.domain
  */
 
 enum class Role(val displayName: String, val tagline: String) {
-    Buyer(
+    BUYER(
         displayName = "Buyer",
         tagline = "Discover products and connect with sellers across Uganda.",
     ),
-    Seller(
+    SELLER(
         displayName = "Seller",
         tagline = "List your products, reach more customers, and grow your business.",
     );
 
     companion object {
-        fun fromName(s: String?): Role = if (s.equals("Seller", true)) Seller else Buyer
+        fun fromName(s: String?): Role = if (s.equals("Seller", true)) SELLER else BUYER
     }
 }
 
@@ -144,6 +144,10 @@ object SessionCache {
     @Volatile var role: Role? = null
     @Volatile var displayName: String? = null
     @Volatile var email: String? = null
+    @Volatile var userId: String? = null
+    @Volatile var storeName: String? = null
+    @Volatile var storeLocation: String? = null
+    @Volatile var avatarUrl: String? = null
 
     /**
      * Atomically set the role + display name + email for the current
@@ -158,24 +162,49 @@ object SessionCache {
      * Empty / null email is preserved as "" — the route argument
      * already defaults to "" and the encoder encodes "" to "".
      */
-    fun set(role: Role, displayName: String?, email: String?) {
-        this.role = role
-        this.displayName = when {
-            displayName.isNullOrBlank() -> when (role) {
-                Role.Seller -> "Seller"
-                Role.Buyer -> "Buyer"
+    fun set(
+            role: Role,
+            displayName: String?,
+            email: String?,
+            userId: String? = null,
+            storeName: String? = null,
+            storeLocation: String? = null,
+            avatarUrl: String? = null,
+        ) {
+            this.role = role
+            this.displayName = when {
+                displayName.isNullOrBlank() -> when (role) {
+                    Role.SELLER -> "Seller"
+                    Role.BUYER -> "Buyer"
+                }
+                else -> displayName
             }
-            else -> displayName
+            this.email = email ?: ""
+            this.userId = userId ?: this.userId
+            this.storeName = storeName ?: this.storeName
+            this.storeLocation = storeLocation ?: this.storeLocation
+            this.avatarUrl = avatarUrl ?: this.avatarUrl
         }
-        this.email = email ?: ""
-    }
 
-    fun clear() {
-        role = null
-        displayName = null
-        email = null
+        fun clear() {
+            role = null
+            displayName = null
+            email = null
+            userId = null
+            storeName = null
+            storeLocation = null
+            avatarUrl = null
+        }
+
+        fun userIdOrNull(): String? = userId
+        fun roleOrNull(): Role? = role
+        fun displayNameOrEmpty(): String = displayName ?: ""
+        fun storeNameOrEmpty(): String = storeName ?: when (role) {
+            Role.SELLER -> "ScottsTechX Store"
+            else -> "ScottsTechX"
+        }
+        fun locationOrEmpty(): String = storeLocation ?: "Kampala"
     }
-}
 // =====================================================================================
 // Seller domain models — Stage 3.2 seller dashboard.
 // =====================================================================================

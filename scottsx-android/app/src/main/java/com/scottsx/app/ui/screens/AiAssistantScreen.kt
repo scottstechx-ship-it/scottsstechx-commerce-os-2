@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.scottsx.app.ai.ScottsTechAi
 import com.scottsx.app.data.MarketplaceDataSource
 import com.scottsx.app.data.domain.Product
 import com.scottsx.app.ui.components.BottomTab
@@ -234,14 +235,14 @@ fun AiAssistantScreen(
                         Spacer(Modifier.height(8.dp))
                     }
                     items(suggestions) { suggestion ->
-                        SuggestionChip(
+                                            SuggestionChip(
                             text = suggestion,
                             onClick = {
                                 messages.add(ChatMessage(text = suggestion, isFromUser = true))
                                 scope.launch {
-                                    val (reply, prods, usedRemote) = askRemoteOrLocal(remote, suggestion)
-                                    if (usedRemote) source = "remote" else source = "local"
-                                    messages.add(ChatMessage(text = reply, isFromUser = false, products = prods))
+                                    val reply = askRemoteOrLocal(suggestion, ScottsTechAi.Context(screen = "ai-assistant"))
+                                    source = reply.source.label
+                                    messages.add(ChatMessage(text = reply.text, isFromUser = false))
                                 }
                             },
                         )
@@ -316,9 +317,9 @@ fun AiAssistantScreen(
                                 val userInput = input
                                 input = ""
                                 scope.launch {
-                                    val (reply, prods, usedRemote) = askRemoteOrLocal(remote, userInput)
-                                    if (usedRemote) source = "remote" else source = "local"
-                                    messages.add(ChatMessage(text = reply, isFromUser = false, products = prods))
+                                    val reply = askRemoteOrLocal(userInput, ScottsTechAi.Context(screen = "ai-assistant"))
+                                    source = reply.source.label
+                                    messages.add(ChatMessage(text = reply.text, isFromUser = false))
                                 }
                             }
                         },
@@ -483,16 +484,12 @@ private data class ChatMessage(
  * "Local fallback").
  */
 private suspend fun askRemoteOrLocal(
-    remote: RemoteAssistantClient,
     query: String,
-): Triple<String, List<Product>, Boolean> {
-    val history = emptyList<ChatTurn>() // Stage 3.1: pull from messages list
-    val result = remote.ask(query, history)
-    return when (result) {
-        is RemoteAssistantClient.Result.Remote -> Triple(result.reply, emptyList(), true)
-        is RemoteAssistantClient.Result.LocalFallback -> {
-            val (reply, prods) = recommend(query)
-            Triple("$reply\n\n_(local fallback — ${result.reason})_", prods, false)
-        }
-    }
+    context: ScottsTechAi.Context,
+): ScottsTechAi.Reply {
+    return ScottsTechAi.ask(
+        userMessage = query,
+        history = emptyList(),
+        context = context,
+    )
 }

@@ -1,5 +1,6 @@
 package com.scottsx.app.data
 
+import com.scottsx.app.data.domain.Role
 import com.scottsx.app.data.domain.SessionCache
 
 /**
@@ -32,4 +33,12 @@ object Session {
         // 3. Local role/profile cache.
         SessionCache.clear()
     }
+
+    // Stage 4 — read accessors used by the secure AI tool layer.
+    fun userIdOrNull(): String? = SessionCache.userIdOrNull()
+    fun roleOrNull(): Role? = SessionCache.roleOrNull()
+    fun displayNameOrEmpty(): String = SessionCache.displayNameOrEmpty()
+    fun storeNameOrEmpty(): String = SessionCache.storeNameOrEmpty()
+    fun locationOrEmpty(): String = SessionCache.locationOrEmpty()
+    fun emailOrEmpty(): String = SessionCache.email ?: ""
 }

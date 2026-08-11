@@ -119,6 +119,10 @@ fun SellerHomeScreen(
     onOpenProfileSettings: () -> Unit = {},
     onOpenMessages: () -> Unit = {},
     onOpenProduct: (com.scottsx.app.data.domain.Product) -> Unit = {},
+    onNavigateToTransactions: () -> Unit = {},
+    onNavigateToReceipts: () -> Unit = {},
+    onCreateReceipt: () -> Unit = {},
+    onNavigateToAiPersonalization: () -> Unit = {},
     onSwitchToBuyer: () -> Unit = {},
     onSignOut: () -> Unit = {},
 ) {
@@ -271,6 +275,10 @@ fun SellerHomeScreen(
                     SellerSidebarDestination.MarketingTools -> onOpenMarketplaceTools()
                     SellerSidebarDestination.StoreProfile -> onOpenStoreSettings()
                     SellerSidebarDestination.StoreSettings -> onOpenStoreSettings()
+                    SellerSidebarDestination.Transactions -> onNavigateToTransactions()
+                    SellerSidebarDestination.Receipts -> onNavigateToReceipts()
+                    SellerSidebarDestination.CreateReceipt -> onCreateReceipt()
+                    SellerSidebarDestination.AiPersonalization -> onNavigateToAiPersonalization()
                     SellerSidebarDestination.SwitchToBuyer -> onSwitchToBuyer()
                     SellerSidebarDestination.Logout -> logoutDialogOpen = true
                     SellerSidebarDestination.ViewStore -> Unit

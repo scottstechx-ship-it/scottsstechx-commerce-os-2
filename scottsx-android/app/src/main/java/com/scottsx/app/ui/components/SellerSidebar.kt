@@ -43,7 +43,10 @@ import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Verified
@@ -82,6 +85,7 @@ enum class SellerSidebarDestination {
     StoreProfile, StoreSettings,
     SwitchToBuyer, Logout, ViewStore,
     Theme, ToggleOnline,
+    Transactions, Receipts, CreateReceipt, AiPersonalization,
 }
 
 private enum class SellerFeaturedKind { SellerAi, Analytics }
@@ -212,6 +216,10 @@ fun SellerSidebarCard(
                 items = listOf(
                     SellerSidebarItem(SellerSidebarDestination.Dashboard, "Dashboard", Icons.Filled.Dashboard, null),
                     SellerSidebarItem(SellerSidebarDestination.Orders, "Orders", Icons.Filled.Inventory2, snapshot.ordersOverview.pending),
+                    SellerSidebarItem(SellerSidebarDestination.CreateReceipt, "Create Receipt", Icons.Filled.ReceiptLong, null),
+                    SellerSidebarItem(SellerSidebarDestination.Transactions, "Transactions", Icons.Filled.SwapHoriz, null),
+                    SellerSidebarItem(SellerSidebarDestination.Receipts, "Receipts", Icons.Filled.Receipt, null),
+                    SellerSidebarItem(SellerSidebarDestination.AiPersonalization, "AI Personalization", Icons.Filled.SmartToy, null),
                     SellerSidebarItem(SellerSidebarDestination.Products, "Products", Icons.Filled.Store, 124),
                     SellerSidebarItem(SellerSidebarDestination.Customers, "Customers", Icons.Filled.Group, snapshot.customersDelta),
                     SellerSidebarItem(SellerSidebarDestination.Messages, "Messages", Icons.Filled.Message, 5),

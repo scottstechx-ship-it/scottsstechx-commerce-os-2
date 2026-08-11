@@ -48,6 +48,9 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
@@ -87,6 +90,7 @@ import com.scottsx.app.ui.theme.ScottsTechXColors
 enum class SidebarDestination {
     Home, Nearby, Ai, Wishlist, Cart, Orders, Messages, Notifications,
     SellerCenter, BecomeSeller, Settings, Theme, Logout, Profile,
+    Transactions, Receipts, AiPersonalization,
 }
 
 /**
@@ -254,6 +258,9 @@ fun BuyerSidebarCard(
                     SidebarItem(SidebarDestination.Wishlist, "Wishlist", Icons.Filled.Favorite, wishlistCount),
                     SidebarItem(SidebarDestination.Cart, "Cart", Icons.Filled.ShoppingCart, cartCount),
                     SidebarItem(SidebarDestination.Orders, "My Orders", Icons.Filled.LocalShipping, ordersCount),
+                    SidebarItem(SidebarDestination.Transactions, "My Transactions", Icons.Filled.SwapHoriz, null),
+                    SidebarItem(SidebarDestination.Receipts, "My Receipts", Icons.Filled.ReceiptLong, null),
+                    SidebarItem(SidebarDestination.AiPersonalization, "AI Personalization", Icons.Filled.SmartToy, null),
                     SidebarItem(SidebarDestination.Messages, "Messages", Icons.Filled.ChatBubble, messagesCount),
                     SidebarItem(SidebarDestination.Notifications, "Notifications", Icons.Filled.Notifications, notificationsCount),
                 ),

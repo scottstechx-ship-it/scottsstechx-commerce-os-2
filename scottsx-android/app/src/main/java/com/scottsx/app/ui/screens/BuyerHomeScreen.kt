@@ -94,6 +94,9 @@ fun BuyerHomeScreen(
     onNavigateToNearby: () -> Unit,
     onNavigateToAi: () -> Unit,
     onNavigateToAllProducts: () -> Unit,
+    onNavigateToTransactions: () -> Unit = {},
+    onNavigateToReceipts: () -> Unit = {},
+    onNavigateToAiPersonalization: () -> Unit = {},
     onOpenProduct: (com.scottsx.app.data.domain.Product) -> Unit = {},
     onOpenStore: (String) -> Unit = {},
     onTabSelect: (BottomTab) -> Unit,
@@ -121,6 +124,9 @@ fun BuyerHomeScreen(
             SidebarDestination.Wishlist -> onTabSelect(BottomTab.Wishlist)
             SidebarDestination.Cart -> onNavigateToCart()
             SidebarDestination.Orders -> onNavigateToAllProducts()
+            SidebarDestination.Transactions -> onNavigateToTransactions()
+            SidebarDestination.Receipts -> onNavigateToReceipts()
+            SidebarDestination.AiPersonalization -> onNavigateToAiPersonalization()
             SidebarDestination.Messages -> { /* TODO 3.1.1 — open Messages */ }
             SidebarDestination.Notifications -> { /* TODO 3.1.1 — open Notifications */ }
             SidebarDestination.SellerCenter -> { /* TODO 3.1.1 — seller dashboard */ }

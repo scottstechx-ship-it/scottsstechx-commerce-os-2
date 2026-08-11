@@ -661,6 +661,12 @@ object MarketplaceDataSource {
     fun storeReviews(sellerId: String): List<Review> =
         productsBySeller(sellerId).flatMap { reviewsFor(it.id) }.sortedByDescending { it.rating }
 
+    /** All distinct seller storefronts in the marketplace. Used by the AI Nearby tool. */
+    fun allStores(): List<SellerStorefront> {
+        val sellerIds = products.map { it.seller.id }.distinct()
+        return sellerIds.mapNotNull { storefront(it) }
+    }
+
     // ----- Seller follow state -----
     private val followedSellers = MutableStateFlow<Set<String>>(setOf("uganda-crafts"))
     val followedSellersFlow: StateFlow<Set<String>> = followedSellers.asStateFlow()

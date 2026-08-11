@@ -19,14 +19,22 @@ import com.scottsx.app.data.domain.Role
 import com.scottsx.app.data.domain.SessionCache
 import com.scottsx.app.ui.components.BottomTab
 import com.scottsx.app.ui.screens.AiAssistantScreen
+import com.scottsx.app.ui.screens.AiPersonalizationScreen
 import com.scottsx.app.ui.screens.BuyerHomeScreen
 import com.scottsx.app.ui.screens.CartScreen
 import com.scottsx.app.ui.screens.CategoriesScreen
+import com.scottsx.app.ui.screens.DisputeScreen
 import com.scottsx.app.ui.screens.HomeScreen
 import com.scottsx.app.ui.screens.LoginScreen
+import com.scottsx.app.ui.screens.NearbyMapScreen
 import com.scottsx.app.ui.screens.NearbyScreen
 import com.scottsx.app.ui.screens.OnboardingFlow
 import com.scottsx.app.ui.screens.ProfileScreen
+import com.scottsx.app.ui.screens.ReceiptDesignerScreen
+import com.scottsx.app.ui.screens.ReceiptPreviewScreen
+import com.scottsx.app.ui.screens.ReceiptsHistoryScreen
+import com.scottsx.app.ui.screens.TransactionDetailScreen
+import com.scottsx.app.ui.screens.TransactionsListScreen
 import com.scottsx.app.ui.screens.RoleSelectionScreen
 import com.scottsx.app.ui.screens.SearchScreen
 import com.scottsx.app.ui.screens.AddProductScreen
@@ -247,10 +255,10 @@ fun AppNavigation() {
             // but the buyer dashboard got requested, bounce to the
             // wrong-role screen so we never show the wrong UI.
             val sessionRole = SessionCache.role
-            if (sessionRole == Role.Seller) {
+            if (sessionRole == Role.SELLER) {
                 LaunchedEffect(Unit) {
                     navController.navigate(
-                        Routes.wrongRole(picked = Role.Buyer, actual = Role.Seller),
+                        Routes.wrongRole(picked = Role.BUYER, actual = Role.SELLER),
                     ) {
                         popUpTo(0) { inclusive = true }
                         launchSingleTop = true
@@ -266,6 +274,9 @@ fun AppNavigation() {
                 onNavigateToNearby = { navController.navigate(Routes.NEARBY) },
                 onNavigateToAi = { navController.navigate(Routes.AI) },
                 onNavigateToAllProducts = { navController.navigate(Routes.CATEGORIES) },
+                onNavigateToTransactions = { navController.navigate(Routes.TRANSACTIONS) },
+                onNavigateToReceipts = { navController.navigate(Routes.RECEIPTS_HISTORY) },
+                onNavigateToAiPersonalization = { navController.navigate(Routes.AI_PERSONALIZATION) },
                 onOpenProduct = { p -> navController.navigate(Routes.product(p.id)) },
                 onOpenStore = { sid -> navController.navigate(Routes.storefront(sid)) },
                 onTabSelect = { tab -> onBuyerTab(navController, tab) },
@@ -295,10 +306,10 @@ fun AppNavigation() {
             val email = backStackEntry.arguments?.getString("email") ?: ""
             // Role-separation gate.
             val sessionRole = SessionCache.role
-            if (sessionRole == Role.Buyer) {
+            if (sessionRole == Role.BUYER) {
                 LaunchedEffect(Unit) {
                     navController.navigate(
-                        Routes.wrongRole(picked = Role.Seller, actual = Role.Buyer),
+                        Routes.wrongRole(picked = Role.SELLER, actual = Role.BUYER),
                     ) {
                         popUpTo(0) { inclusive = true }
                         launchSingleTop = true
@@ -318,6 +329,10 @@ fun AppNavigation() {
                 onOpenProfileSettings = { navController.navigate(Routes.SELLER_PROFILE_SETTINGS) },
                 onOpenMessages = { navController.navigate(Routes.SELLER_MESSAGES) },
                 onOpenProduct = { product -> navController.navigate(Routes.product(product.id)) },
+                onNavigateToTransactions = { navController.navigate(Routes.TRANSACTIONS) },
+                onNavigateToReceipts = { navController.navigate(Routes.RECEIPTS_HISTORY) },
+                onCreateReceipt = { navController.navigate(Routes.RECEIPT_NEW) },
+                onNavigateToAiPersonalization = { navController.navigate(Routes.AI_PERSONALIZATION) },
                 onSwitchToBuyer = {
                     // Switch to buyer app: keep the same Firebase session,
                     // just flip the role expectation so the buyer dashboard
@@ -513,6 +528,97 @@ fun AppNavigation() {
         composable(Routes.SELLER_PROFILE_SETTINGS) {
             ProfileSettingsScreen(onBack = { navController.popBackStack() })
         }
+
+        // ---- Stage 4 transactions / receipts / AI personalization ----
+        composable(Routes.TRANSACTIONS) {
+            TransactionsListScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTransaction = { id -> navController.navigate(Routes.transaction(id)) },
+                onOpenReceipt = { num -> navController.navigate(Routes.receiptPreview(num)) },
+            )
+        }
+        composable(
+            Routes.TRANSACTION_DETAIL,
+            arguments = listOf(navArgument("transactionId") { type = NavType.StringType }),
+        ) { entry ->
+            val tid = entry.arguments?.getString("transactionId").orEmpty()
+            TransactionDetailScreen(
+                transactionId = tid,
+                onBack = { navController.popBackStack() },
+                onOpenReceipt = { num -> navController.navigate(Routes.receiptPreview(num)) },
+                onOpenThread = { threadId, _ -> navController.navigate("thread/$threadId/") },
+                onOpenDispute = { id -> navController.navigate(Routes.dispute(id)) },
+                onCreateReceipt = { id -> navController.navigate(Routes.receiptNewForTx(id)) },
+            )
+        }
+        composable(Routes.RECEIPT_NEW) {
+            ReceiptDesignerScreen(
+                transactionId = null,
+                onBack = { navController.popBackStack() },
+                onReceiptCreated = { num ->
+                    navController.navigate(Routes.receiptPreview(num)) {
+                        popUpTo(Routes.RECEIPT_NEW) { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable(
+            Routes.RECEIPT_NEW_FOR_TX,
+            arguments = listOf(navArgument("transactionId") { type = NavType.StringType }),
+        ) { entry ->
+            val tid = entry.arguments?.getString("transactionId").orEmpty()
+            ReceiptDesignerScreen(
+                transactionId = tid,
+                onBack = { navController.popBackStack() },
+                onReceiptCreated = { num ->
+                    navController.navigate(Routes.receiptPreview(num)) {
+                        popUpTo(Routes.RECEIPT_NEW_FOR_TX) { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable(
+            Routes.RECEIPT_PREVIEW,
+            arguments = listOf(navArgument("receiptNumber") { type = NavType.StringType }),
+        ) { entry ->
+            val num = entry.arguments?.getString("receiptNumber").orEmpty()
+            ReceiptPreviewScreen(
+                receiptNumber = num,
+                onBack = { navController.popBackStack() },
+                onAcknowledge = { /* acknowledged */ },
+            )
+        }
+        composable(Routes.RECEIPTS_HISTORY) {
+            ReceiptsHistoryScreen(
+                onBack = { navController.popBackStack() },
+                onOpenReceipt = { num -> navController.navigate(Routes.receiptPreview(num)) },
+            )
+        }
+        composable(
+            Routes.DISPUTE,
+            arguments = listOf(navArgument("transactionId") { type = NavType.StringType }),
+        ) { entry ->
+            val tid = entry.arguments?.getString("transactionId").orEmpty()
+            DisputeScreen(
+                transactionId = tid,
+                onBack = { navController.popBackStack() },
+                onDone = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.AI_PERSONALIZATION) {
+            AiPersonalizationScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.NEARBY_MAP) {
+            NearbyMapScreen(
+                onBack = { navController.popBackStack() },
+                onOpenSeller = { id -> navController.navigate(Routes.storefront(id)) },
+                onMessageSeller = { sid, pid ->
+                    val path = if (pid.isBlank()) "thread/$sid/" else "thread/$sid/$pid"
+                    navController.navigate(path)
+                },
+                onOpenProduct = { id -> navController.navigate(Routes.product(id)) },
+            )
+        }
     }
 
 }
@@ -613,6 +719,25 @@ object Routes {
     const val SELLER_STORE_SETTINGS = "seller/store-settings"
     const val SELLER_PROFILE_SETTINGS = "seller/profile-settings"
 
+    // ---- Stage 4 transaction / receipt / AI routes ----
+    const val TRANSACTIONS = "transactions"
+    const val TRANSACTION_DETAIL = "transaction/{transactionId}"
+    const val RECEIPT_NEW = "receipt/new"
+    const val RECEIPT_NEW_FOR_TX = "receipt/new/{transactionId}"
+    const val RECEIPT_PREVIEW = "receipt/preview/{receiptNumber}"
+    const val RECEIPTS_HISTORY = "receipts"
+    const val DISPUTE = "dispute/{transactionId}"
+    const val AI_PERSONALIZATION = "ai/personalization"
+    const val NEARBY_MAP = "nearby/map"
+    const val AGREEMENT_PROPOSAL = "agreement/new/{productId}"
+
+    fun transaction(id: String) = "transaction/${URLEncoder.encode(id, "UTF-8")}"
+    fun receiptNew() = "receipt/new"
+    fun receiptNewForTx(id: String) = "receipt/new/${URLEncoder.encode(id, "UTF-8")}"
+    fun receiptPreview(num: String) = "receipt/preview/${URLEncoder.encode(num, "UTF-8")}"
+    fun dispute(id: String) = "dispute/${URLEncoder.encode(id, "UTF-8")}"
+    fun agreementNew(productId: String) = "agreement/new/${URLEncoder.encode(productId, "UTF-8")}"
+
     fun product(id: String) = "product/${URLEncoder.encode(id, "UTF-8")}"
     fun storefront(id: String) = "storefront/${URLEncoder.encode(id, "UTF-8")}"
     fun reviews(id: String) = "reviews/${URLEncoder.encode(id, "UTF-8")}"
@@ -637,14 +762,14 @@ object Routes {
      * found in the navigation graph".
      */
     fun dashboard(role: Role): String = when (role) {
-        Role.Buyer -> buyerHome(
+        Role.BUYER -> buyerHome(
             com.scottsx.app.data.domain.BuyerProfile(
                 uid = "",
                 displayName = SessionCache.displayName ?: "Buyer",
                 email = SessionCache.email ?: "buyer",
             ),
         )
-        Role.Seller -> sellerHome(
+        Role.SELLER -> sellerHome(
             displayName = SessionCache.displayName ?: "Seller",
             email = SessionCache.email ?: "seller",
         )
@@ -660,5 +785,5 @@ object Routes {
             java.net.URLEncoder.encode(profile.email, "UTF-8")
 
     fun roleFromBackStack(s: String?): Role =
-        if (s.equals("Seller", true)) Role.Seller else Role.Buyer
+        if (s.equals("Seller", true)) Role.SELLER else Role.BUYER
 }
