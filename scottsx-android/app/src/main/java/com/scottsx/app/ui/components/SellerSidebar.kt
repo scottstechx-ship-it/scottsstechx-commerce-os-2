@@ -79,6 +79,7 @@ import com.scottsx.app.data.preferences.ThemePreference
 import com.scottsx.app.data.preferences.themeState
 import com.scottsx.app.ui.theme.ScottsTechXColors
 import coil.compose.AsyncImage
+import com.scottsx.app.data.domain.SessionCache
 
 /** What a seller sidebar tap wants to do. */
 enum class SellerSidebarDestination {
@@ -295,9 +296,6 @@ fun SellerSidebarCard(
             }
 
         }
-    }
-}
-
         // Sticky bottom bar — logout is always visible at the drawer bottom.
         Row(
             modifier = Modifier
@@ -307,6 +305,8 @@ fun SellerSidebarCard(
         ) {
             SellerLogOutRow(onClick = { onNavigate(SellerSidebarDestination.Logout) })
         }
+    }
+}
 
 @Composable
 private fun SellerSidebarHeader(
