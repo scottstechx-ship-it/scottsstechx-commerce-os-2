@@ -20,6 +20,12 @@ import com.scottsx.app.data.domain.SessionCache
  * signed in with Google) the Google clear is silently skipped.
  */
 object Session {
+    // Stage 5 — bearer token for the Fastify REST API.
+    // Set by the Firebase-auth sign-in flow.
+    @Volatile private var jwt: String? = null
+    fun setToken(t: String?) { jwt = t }
+    fun tokenOrNull(): String? = jwt
+
     suspend fun signOut(
         authRepository: AuthRepository,
         googleHelper: GoogleSignInHelper? = null,

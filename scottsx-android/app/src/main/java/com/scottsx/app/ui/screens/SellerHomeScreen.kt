@@ -123,6 +123,7 @@ fun SellerHomeScreen(
     onNavigateToReceipts: () -> Unit = {},
     onCreateReceipt: () -> Unit = {},
     onNavigateToAiPersonalization: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     onSwitchToBuyer: () -> Unit = {},
     onSignOut: () -> Unit = {},
 ) {
@@ -279,6 +280,7 @@ fun SellerHomeScreen(
                     SellerSidebarDestination.Receipts -> onNavigateToReceipts()
                     SellerSidebarDestination.CreateReceipt -> onCreateReceipt()
                     SellerSidebarDestination.AiPersonalization -> onNavigateToAiPersonalization()
+                    SellerSidebarDestination.Settings -> onNavigateToSettings()
                     SellerSidebarDestination.SwitchToBuyer -> onSwitchToBuyer()
                     SellerSidebarDestination.Logout -> logoutDialogOpen = true
                     SellerSidebarDestination.ViewStore -> Unit

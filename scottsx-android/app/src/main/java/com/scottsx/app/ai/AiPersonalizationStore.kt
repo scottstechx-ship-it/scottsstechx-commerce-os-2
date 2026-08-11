@@ -160,7 +160,6 @@ object AiPersonalizationStore {
         sellerCategories.clear()
         quickActionCounts.value = emptyMap()
         // language / theme / aiOpenedCount are user-set preferences, not memory
-    }
         mirror()
     }
 
@@ -197,7 +196,6 @@ object AiPersonalizationStore {
             sb.append("- AI opened ").append(aiOpenedCount.value).append("×\n")
         return if (sb.isEmpty()) "No personalization signals recorded yet." else sb.toString()
     }
-}
 
     private fun mirror() {
         Mirror.aiMemory(
@@ -209,4 +207,4 @@ object AiPersonalizationStore {
             aiOpenCount = aiOpenedCount.value,
         )
     }
-
+}

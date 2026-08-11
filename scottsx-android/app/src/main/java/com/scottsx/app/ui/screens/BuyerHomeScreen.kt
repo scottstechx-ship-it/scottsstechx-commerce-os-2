@@ -97,6 +97,7 @@ fun BuyerHomeScreen(
     onNavigateToTransactions: () -> Unit = {},
     onNavigateToReceipts: () -> Unit = {},
     onNavigateToAiPersonalization: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     onOpenProduct: (com.scottsx.app.data.domain.Product) -> Unit = {},
     onOpenStore: (String) -> Unit = {},
     onTabSelect: (BottomTab) -> Unit,
@@ -131,7 +132,7 @@ fun BuyerHomeScreen(
             SidebarDestination.Notifications -> { /* TODO 3.1.1 — open Notifications */ }
             SidebarDestination.SellerCenter -> { /* TODO 3.1.1 — seller dashboard */ }
             SidebarDestination.BecomeSeller -> { /* TODO 3.1.1 — upgrade CTA */ }
-            SidebarDestination.Settings -> onTabSelect(BottomTab.Profile)
+            SidebarDestination.Settings -> onNavigateToSettings()
             SidebarDestination.Theme -> themeSheetOpen = true
             SidebarDestination.Logout -> logoutDialogOpen = true
             SidebarDestination.Profile -> onTabSelect(BottomTab.Profile)

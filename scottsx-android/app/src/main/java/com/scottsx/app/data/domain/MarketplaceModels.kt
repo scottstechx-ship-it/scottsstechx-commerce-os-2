@@ -148,6 +148,7 @@ object SessionCache {
     @Volatile var storeName: String? = null
     @Volatile var storeLocation: String? = null
     @Volatile var avatarUrl: String? = null
+    @Volatile var firebaseUid: String? = null
 
     /**
      * Atomically set the role + display name + email for the current

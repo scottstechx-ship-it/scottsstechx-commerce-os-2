@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -82,7 +83,7 @@ import com.scottsx.app.ui.theme.ScottsTechXColors
 enum class SellerSidebarDestination {
     Dashboard, Orders, Products, Customers, Messages, Promotions, Analytics,
     SellerAi, MarketingTools,
-    StoreProfile, StoreSettings,
+    StoreProfile, StoreSettings, Settings,
     SwitchToBuyer, Logout, ViewStore,
     Theme, ToggleOnline,
     Transactions, Receipts, CreateReceipt, AiPersonalization,
@@ -262,6 +263,7 @@ fun SellerSidebarCard(
                 items = listOf(
                     SellerSidebarItem(SellerSidebarDestination.StoreProfile, "Store Profile", Icons.Filled.Person, null),
                     SellerSidebarItem(SellerSidebarDestination.StoreSettings, "Store Settings", Icons.Filled.Settings, null),
+                    SellerSidebarItem(SellerSidebarDestination.Settings, "App Settings", Icons.Filled.Tune, null),
                 ),
             ) { index, item ->
                 SellerSidebarRow(item, onClick = { onNavigate(item.destination) }, index = index)

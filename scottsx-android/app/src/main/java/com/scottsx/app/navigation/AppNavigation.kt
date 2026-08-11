@@ -53,6 +53,7 @@ import com.scottsx.app.ui.screens.SplashScreen
 import com.scottsx.app.ui.screens.StoreSettingsScreen
 import com.scottsx.app.ui.screens.WishlistScreen
 import com.scottsx.app.ui.screens.WrongRoleScreen
+import com.scottsx.app.ui.screens.SettingsScreen
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
 
@@ -277,9 +278,9 @@ fun AppNavigation() {
                 onNavigateToTransactions = { navController.navigate(Routes.TRANSACTIONS) },
                 onNavigateToReceipts = { navController.navigate(Routes.RECEIPTS_HISTORY) },
                 onNavigateToAiPersonalization = { navController.navigate(Routes.AI_PERSONALIZATION) },
-                onOpenProduct = { p -> navController.navigate(Routes.product(p.id)) },
+                onOpenProduct = { p: com.scottsx.app.data.domain.Product -> navController.navigate(Routes.product(p.id)) },
                 onOpenStore = { sid -> navController.navigate(Routes.storefront(sid)) },
-                onTabSelect = { tab -> onBuyerTab(navController, tab) },
+                onTabSelect = { tab: BottomTab -> onBuyerTab(navController, tab) },
                 // Stage 3.1 sidebar sign-out: same single sign-out helper
                 // we use everywhere; clear Firebase + Google SDK +
                 // SessionCache, then bounce back to the role picker.
@@ -333,6 +334,7 @@ fun AppNavigation() {
                 onNavigateToReceipts = { navController.navigate(Routes.RECEIPTS_HISTORY) },
                 onCreateReceipt = { navController.navigate(Routes.RECEIPT_NEW) },
                 onNavigateToAiPersonalization = { navController.navigate(Routes.AI_PERSONALIZATION) },
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onSwitchToBuyer = {
                     // Switch to buyer app: keep the same Firebase session,
                     // just flip the role expectation so the buyer dashboard
@@ -357,41 +359,41 @@ fun AppNavigation() {
         composable(Routes.CART) {
             CartScreen(
                 onBack = { navController.popBackStack() },
-                onTabSelect = { tab -> onBuyerTab(navController, tab) },
+                onTabSelect = { tab: BottomTab -> onBuyerTab(navController, tab) },
             )
         }
         composable(Routes.NEARBY) {
             NearbyScreen(
                 onBack = { navController.popBackStack() },
-                onTabSelect = { tab -> onBuyerTab(navController, tab) },
+                onTabSelect = { tab: BottomTab -> onBuyerTab(navController, tab) },
             )
         }
         composable(Routes.AI) {
-            AiAssistantScreen(
+            RealAiChatScreen(
                 onBack = { navController.popBackStack() },
-                onOpenProduct = { p -> navController.navigate(Routes.product(p.id)) },
-                onTabSelect = { tab -> onBuyerTab(navController, tab) },
+                onOpenProduct = { p: com.scottsx.app.data.domain.Product -> navController.navigate(Routes.product(p.id)) },
+                onTabSelect = { tab: BottomTab -> onBuyerTab(navController, tab) },
             )
         }
         composable(Routes.SEARCH) {
             SearchScreen(
                 onBack = { navController.popBackStack() },
-                onOpenProduct = { p -> navController.navigate(Routes.product(p.id)) },
-                onTabSelect = { tab -> onBuyerTab(navController, tab) },
+                onOpenProduct = { p: com.scottsx.app.data.domain.Product -> navController.navigate(Routes.product(p.id)) },
+                onTabSelect = { tab: BottomTab -> onBuyerTab(navController, tab) },
             )
         }
         composable(Routes.CATEGORIES) {
             CategoriesScreen(
                 onBack = { navController.popBackStack() },
-                onOpenProduct = { p -> navController.navigate(Routes.product(p.id)) },
-                onTabSelect = { tab -> onBuyerTab(navController, tab) },
+                onOpenProduct = { p: com.scottsx.app.data.domain.Product -> navController.navigate(Routes.product(p.id)) },
+                onTabSelect = { tab: BottomTab -> onBuyerTab(navController, tab) },
             )
         }
         composable(Routes.WISHLIST) {
             WishlistScreen(
                 onBack = { navController.popBackStack() },
-                onOpenProduct = { p -> navController.navigate(Routes.product(p.id)) },
-                onTabSelect = { tab -> onBuyerTab(navController, tab) },
+                onOpenProduct = { p: com.scottsx.app.data.domain.Product -> navController.navigate(Routes.product(p.id)) },
+                onTabSelect = { tab: BottomTab -> onBuyerTab(navController, tab) },
             )
         }
         composable(
@@ -408,7 +410,7 @@ fun AppNavigation() {
             ProfileScreen(
                 profile = profile,
                 onBack = { navController.popBackStack() },
-                onTabSelect = { tab -> onBuyerTab(navController, tab) },
+                onTabSelect = { tab: BottomTab -> onBuyerTab(navController, tab) },
                 onSignOut = {
                     scope.launch {
                         Session.signOut(authRepository, null)
@@ -608,15 +610,18 @@ fun AppNavigation() {
         composable(Routes.AI_PERSONALIZATION) {
             AiPersonalizationScreen(onBack = { navController.popBackStack() })
         }
+
+        composable(Routes.SETTINGS) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenAiPersonalization = { navController.navigate(Routes.AI_PERSONALIZATION) },
+            )
+        }
         composable(Routes.NEARBY_MAP) {
             NearbyMapScreen(
                 onBack = { navController.popBackStack() },
-                onOpenSeller = { id -> navController.navigate(Routes.storefront(id)) },
-                onMessageSeller = { sid, pid ->
-                    val path = if (pid.isBlank()) "thread/$sid/" else "thread/$sid/$pid"
-                    navController.navigate(path)
-                },
-                onOpenProduct = { id -> navController.navigate(Routes.product(id)) },
+                onOpenStore = { id -> navController.navigate(Routes.storefront(id)) },
+                onOpenProductById = { id -> navController.navigate(Routes.product(id)) },
             )
         }
     }
@@ -730,6 +735,7 @@ object Routes {
     const val AI_PERSONALIZATION = "ai/personalization"
     const val NEARBY_MAP = "nearby/map"
     const val AGREEMENT_PROPOSAL = "agreement/new/{productId}"
+    const val SETTINGS = "settings"
 
     fun transaction(id: String) = "transaction/${URLEncoder.encode(id, "UTF-8")}"
     fun receiptNew() = "receipt/new"

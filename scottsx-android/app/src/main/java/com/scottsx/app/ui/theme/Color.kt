@@ -46,4 +46,17 @@ object ScottsTechXColors {
     val OnLight = Color(0xFF0F172A)
     val OnLightSecondary = Color(0xFF6B7280)
     val AccentLink = Color(0xFF1E40AF)
+
+    // ----------------------------------------------------------------
+    // Semantic aliases (used by the rest of the app for cases where
+    // the brand wants a single name regardless of theme).
+    // ----------------------------------------------------------------
+    val Primary = BluePrimary
+    val TextPrimary = OnDark
+    val TextSecondary = OnDarkSecondary
+    val TextMuted = OnDarkMuted
+    val Surface = SurfacePanelDark
+    val Divider = Color(0xFF1F2937)
+    val Background = BackgroundDark
+    val BackgroundSubtle = Color(0xFF0C1220)
 }

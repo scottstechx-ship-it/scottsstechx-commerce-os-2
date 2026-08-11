@@ -49,7 +49,7 @@ class AuthRepository(
                     it,
                 )
             }
-            .getOrNull() ?: Role.Buyer
+            .getOrNull() ?: Role.BUYER
         SessionCache.set(actualRole, user.displayName, user.email)
         // Enforce role separation: if the caller asked for a specific role
         // (they tapped "Login as Buyer" or "Login as Seller" at the role
@@ -95,7 +95,7 @@ class AuthRepository(
             put("phone", phone.trim())
             put("role", role.name.lowercase())
             put("createdAt", com.google.firebase.firestore.FieldValue.serverTimestamp())
-            if (role == Role.Seller && sellerExtras != null) {
+            if (role == Role.SELLER && sellerExtras != null) {
                 put("seller", mapOf(
                     "businessName" to sellerExtras.businessName,
                     "businessType" to sellerExtras.businessType,
@@ -201,7 +201,7 @@ class AuthRepository(
         val snap = db.collection("users").document(uid).get().await()
         if (!snap.exists()) return null
         val raw = snap.getString("role") ?: return null
-        return if (raw.equals("seller", ignoreCase = true)) Role.Seller else Role.Buyer
+        return if (raw.equals("seller", ignoreCase = true)) Role.SELLER else Role.BUYER
     }
 
     /**
@@ -223,7 +223,7 @@ class AuthRepository(
             .await()
         if (snap.isEmpty) return null
         val raw = snap.documents.firstOrNull()?.getString("role") ?: return null
-        return if (raw.equals("seller", ignoreCase = true)) Role.Seller else Role.Buyer
+        return if (raw.equals("seller", ignoreCase = true)) Role.SELLER else Role.BUYER
     }
 
 }
