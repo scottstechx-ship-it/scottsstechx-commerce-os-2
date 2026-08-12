@@ -109,6 +109,67 @@ object V2Client {
         ) ?: false
 
     // ============================================================
+    // PRODUCTS
+    // ============================================================
+
+    /**
+     * Fetch the full product catalogue (public endpoint, no auth
+     * required). Returns [Product] instances decoded from the
+     * v2 product response. The result is intentionally permissive —
+     * unknown categories fall back to "All" so a single missing
+     * enum entry cannot break the home feed.
+     */
+    suspend fun fetchProductsList(): List<com.scottsx.app.data.domain.Product> {
+        val arr = apiCallArray(
+            method = "GET",
+            path = "/api/v1/products",
+            body = null,
+            parse = { it },
+        ) ?: return emptyList()
+        val out = ArrayList<com.scottsx.app.data.domain.Product>(arr.length())
+        for (i in 0 until arr.length()) {
+            val row = arr.optJSONObject(i) ?: continue
+            out += jsonToProduct(row)
+        }
+        return out
+    }
+
+    private fun jsonToProduct(o: org.json.JSONObject): com.scottsx.app.data.domain.Product {
+        val title = o.optString("title")
+        val description = o.optString("description")
+        val category = com.scottsx.app.data.domain.ProductCategory.fromApiName(o.optString("category"))
+            ?: com.scottsx.app.data.domain.ProductCategory.All
+        val sellerId = o.optString("sellerId")
+        val sellerName = o.optString("sellerBusinessName").ifEmpty { "ScottsTechX Seller" }
+        val priceUgx = o.optLong("priceMinor", 0L)
+        val imageUrl = o.optString("imageUrl").takeIf { it.isNotBlank() } ?: ""
+        return com.scottsx.app.data.domain.Product(
+            id = o.optString("id"),
+            name = title,
+            shortDescription = description.take(80),
+            description = description,
+            priceUgx = priceUgx,
+            oldPriceUgx = null,
+            category = category,
+            brand = com.scottsx.app.data.domain.Brand.Generic,
+            seller = com.scottsx.app.data.domain.Seller(
+                id = sellerId,
+                displayName = sellerName,
+                storeName = sellerName,
+                rating = 4.5f,
+                productCount = 0,
+                location = "Kampala",
+                latitude = 0.3476,
+                longitude = 32.5825,
+            ),
+            imageUrl = imageUrl,
+            stock = o.optInt("stockQuantity", 1),
+            rating = o.optDouble("productTrustScore", 4.4).toFloat(),
+            ratingCount = 12,
+        )
+    }
+
+    // ============================================================
     // USER PROFILE / ADDRESSES / PAYMENT METHODS / ETC.
     // ============================================================
 

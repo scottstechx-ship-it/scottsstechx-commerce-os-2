@@ -112,6 +112,22 @@ fun BuyerHomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val cartItems by CartStore.items.collectAsState()
+    // Fetch live products from the backend (so new seller uploads
+    // appear in the buyer feed). Falls back to the static
+    // MarketplaceDataSource if the network call fails or returns empty.
+    var apiProducts by remember { mutableStateOf<List<com.scottsx.app.data.domain.Product>>(emptyList()) }
+    var apiLoaded by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        scope.launch {
+            try {
+                val arr = com.scottsx.app.data.remote.V2Client.fetchProductsList()
+                apiProducts = arr
+                apiLoaded = true
+            } catch (e: Exception) { apiLoaded = true }
+        }
+    }
+    val flashDeals = if (apiProducts.isNotEmpty()) apiProducts.take(6) else MarketplaceDataSource.flashDeals
+    val recommended = if (apiProducts.isNotEmpty()) apiProducts.drop(6).take(10) else MarketplaceDataSource.recommended
     val cartCount = cartItems.sumOf { it.quantity }
 
     var selectedCategory by remember { mutableStateOf(ProductCategory.All) }
@@ -324,7 +340,7 @@ fun BuyerHomeScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(MarketplaceDataSource.flashDeals, key = { it.id }) { product ->
+                    items(flashDeals, key = { it.id }) { product ->
                         ProductCard(
                             product = product,
                             onClick = { onOpenProduct(product) },
@@ -352,7 +368,7 @@ fun BuyerHomeScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(MarketplaceDataSource.recommended, key = { it.id }) { product ->
+                    items(recommended, key = { it.id }) { product ->
                         ProductCard(
                             product = product,
                             onClick = { /* Stage 2 — product details */ },
