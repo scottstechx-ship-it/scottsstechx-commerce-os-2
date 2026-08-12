@@ -37,30 +37,18 @@ fun SellerMessagesScreen(
     onOpenThread: (conversationId: String, peerName: String) -> Unit,
 ) {
         val scope = rememberCoroutineScope()
-    var conversations by remember { mutableStateOf<List<org.json.JSONObject>>(emptyList()) }
+    var conversations by remember { mutableStateOf<List<V2Client.Conversation>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         scope.launch {
             loading = true
-            val me = SessionCache.userIdOrNull().orEmpty()
-            // Real backend: GET /api/v1/chat/v2/conversations returns all
-            // conversations; filter to ones where I am a participant.
-            val arr = try {
+            // V2Client.fetchConversations() returns a typed List<Conversation>.
+            // Server already scopes to the current user via the auth token,
+            // so we can just use the result directly.
+            conversations = try {
                 V2Client.fetchConversations()
-            } catch (e: Exception) { null }
-            conversations = buildList {
-                if (arr != null) {
-                    for (i in 0 until arr.length()) {
-                        val convo = arr.optJSONObject(i) ?: continue
-                        val sellerId = convo.optString("sellerId")
-                        val buyerId = convo.optString("buyerId")
-                        if (me == sellerId || me == buyerId) {
-                            add(convo)
-                        }
-                    }
-                }
-            }
+            } catch (e: Exception) { emptyList() }
             loading = false
         }
     }
@@ -96,13 +84,11 @@ fun SellerMessagesScreen(
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(conversations, key = { it.optString("id") }) { convo ->
+                items(conversations, key = { it.conversationId }) { convo ->
                     ConversationRow(
                         convo = convo,
                         onClick = {
-                            val peerId = if (convo.optString("buyerId") == SessionCache.userIdOrNull().orEmpty())
-                                convo.optString("sellerId") else convo.optString("buyerId")
-                            onOpenThread(convo.optString("id"), peerId)
+                            onOpenThread(convo.conversationId, convo.otherPartyId)
                         },
                     )
                 }
@@ -134,13 +120,11 @@ private fun EmptyMessagesHint() {
 }
 
 @Composable
-private fun ConversationRow(convo: org.json.JSONObject, onClick: () -> Unit) {
-        val me = SessionCache.userIdOrNull().orEmpty()
-    val otherId = if (convo.optString("buyerId") == me) convo.optString("sellerId") else convo.optString("buyerId")
-    val otherName = convo.optString("otherPartyName", otherId.take(8))
-    val lastMsg = convo.optString("lastMessage", "New conversation")
-    val lastTime = convo.optString("lastMessageAt", "")
-    val unread = convo.optInt("unreadCount", 0)
+private fun ConversationRow(convo: V2Client.Conversation, onClick: () -> Unit) {
+    val otherName = convo.otherPartyDisplayName.ifBlank { convo.otherPartyId.take(8) }
+    val lastMsg = convo.lastMessagePreview ?: "New conversation"
+    val lastTime = convo.lastMessageAt.orEmpty()
+    val unread = convo.unreadCount
     Row(
         modifier = Modifier
             .fillMaxWidth()
