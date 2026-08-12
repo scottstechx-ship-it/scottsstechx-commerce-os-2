@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scottsx.app.data.remote.V2Client
 import com.scottsx.app.data.transactions.TransactionStore
+import com.scottsx.app.data.domain.TransactionStatus
 import com.scottsx.app.ui.components.SettingsScaffold
 import com.scottsx.app.ui.components.SettingsBlankHint
 import com.scottsx.app.ui.theme.ScottsTechXColors

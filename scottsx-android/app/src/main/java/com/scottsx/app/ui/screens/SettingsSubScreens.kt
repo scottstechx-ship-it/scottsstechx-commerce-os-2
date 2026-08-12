@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scottsx.app.data.preferences.NotificationPrefs
+import com.scottsx.app.data.remote.V2Client
 import com.scottsx.app.ui.components.SettingsScaffold
 import com.scottsx.app.ui.components.SettingsSectionHeader
 import com.scottsx.app.ui.theme.ScottsTechXColors
