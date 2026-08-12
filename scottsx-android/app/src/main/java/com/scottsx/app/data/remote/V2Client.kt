@@ -312,9 +312,9 @@ object V2Client {
     ) ?: false
 
     // Audit log
-    suspend fun fetchMyAudit(): JSONObject? = apiCall(
+    suspend fun fetchMyAudit(): JSONArray? = apiCallArray(
         method = "GET", path = "/api/v1/audit/me", body = null,
-        parse = { o -> o },
+        parse = { it },
     )
 
 

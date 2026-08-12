@@ -162,13 +162,13 @@ fun AuditScreen(onBack: () -> Unit) {
             val arr = V2Client.fetchMyAudit()
             items.clear()
             if (arr != null) {
-                    for (i in 0 until arr.length()) {
-                        val obj = arr.optJSONObject(i)
-                        if (obj != null) {
-                            items.add(obj as JSONObject)
-                        }
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i)
+                    if (obj != null) {
+                        items.add(obj as JSONObject)
                     }
                 }
+            }
             loading = false
         }
     }
