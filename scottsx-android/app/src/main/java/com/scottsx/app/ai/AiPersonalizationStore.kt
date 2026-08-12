@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import com.scottsx.app.data.domain.ProductCategory
 import com.scottsx.app.data.domain.Role
 import com.scottsx.app.data.firebase.Mirror
+import kotlinx.coroutines.launch
 
 /**
  * Stage 4 — Adaptive AI personalization store.

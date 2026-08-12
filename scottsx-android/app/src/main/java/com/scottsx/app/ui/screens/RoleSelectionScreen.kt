@@ -52,7 +52,7 @@ fun RoleSelectionScreen(
     onLogin: (Role) -> Unit,
     onSignUp: (Role) -> Unit,
 ) {
-    var selected by remember { mutableStateOf(Role.Buyer) }
+    var selected by remember { mutableStateOf(Role.BUYER) }
 
     Box(modifier = Modifier.fillMaxSize().background(ScottsTechXColors.BackgroundDark)) {
         UgandaMapBackground()
@@ -107,21 +107,21 @@ fun RoleSelectionScreen(
             Spacer(modifier = Modifier.height(28.dp))
 
             RoleCard(
-                role = Role.Buyer,
-                selected = selected == Role.Buyer,
-                onSelect = { selected = Role.Buyer },
-                onLogin = { onLogin(Role.Buyer) },
-                onSignUp = { onSignUp(Role.Buyer) },
+                role = Role.BUYER,
+                selected = selected == Role.BUYER,
+                onSelect = { selected = Role.BUYER },
+                onLogin = { onLogin(Role.BUYER) },
+                onSignUp = { onSignUp(Role.BUYER) },
             )
 
             Spacer(modifier = Modifier.height(14.dp))
 
             RoleCard(
-                role = Role.Seller,
-                selected = selected == Role.Seller,
-                onSelect = { selected = Role.Seller },
-                onLogin = { onLogin(Role.Seller) },
-                onSignUp = { onSignUp(Role.Seller) },
+                role = Role.SELLER,
+                selected = selected == Role.SELLER,
+                onSelect = { selected = Role.SELLER },
+                onLogin = { onLogin(Role.SELLER) },
+                onSignUp = { onSignUp(Role.SELLER) },
             )
 
             Spacer(modifier = Modifier.weight(1f))

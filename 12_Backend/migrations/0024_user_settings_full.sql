@@ -33,7 +33,7 @@
 --     key/value system content (terms, privacy, about, buyer-protection)
 --   audit_log
 --     append-only audit log of every user action (settings changes,
---     payments, etc.) — used by the security/audit dashboard
+--     payments, etc.) -- used by the security/audit dashboard
 
 -- ---------------------------------------------------------------------------
 -- 1. Extend users
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS user_payment_methods (
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   kind        text NOT NULL CHECK (kind IN ('mobile_money','card','bank','cash')),
   provider    text,                            -- 'mtn','airtel','visa','mastercard',...
-  label       text NOT NULL,                   -- 'MTN Mobile Money', 'Visa •••• 4242'
+  label       text NOT NULL,                   -- 'MTN Mobile Money', 'Visa **** 4242'
   account     text NOT NULL,                   -- phone number / masked card / IBAN
   is_default  boolean NOT NULL DEFAULT false,
   expires_at  date,                            -- for cards
@@ -157,7 +157,7 @@ CREATE POLICY saved_sellers_self ON saved_sellers
 CREATE TABLE IF NOT EXISTS refunds (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id         uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  transaction_id  uuid,                                  -- nullable — refunds can be linked to a transaction
+  transaction_id  uuid,                                  -- nullable -- refunds can be linked to a transaction
   receipt_number  text,                                  -- or to a receipt directly
   amount_minor    bigint NOT NULL,
   currency        text NOT NULL DEFAULT 'UGX',
@@ -242,13 +242,14 @@ CREATE POLICY support_tickets_self ON support_tickets
 
 CREATE TABLE IF NOT EXISTS cms_content (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-  slug        text NOT NULL UNIQUE,           -- 'terms','privacy','about','buyer-protection'
+  slug        text NOT NULL,
   title       text NOT NULL,
   body        text NOT NULL,
   version     text NOT NULL DEFAULT '1.0',
   locale      text NOT NULL DEFAULT 'en',
   published   boolean NOT NULL DEFAULT true,
-  updated_at  timestamptz NOT NULL DEFAULT NOW()
+  updated_at  timestamptz NOT NULL DEFAULT NOW(),
+  UNIQUE (slug, locale)
 );
 
 CREATE INDEX IF NOT EXISTS cms_content_slug_idx ON cms_content(slug, locale, published);
@@ -259,7 +260,7 @@ INSERT INTO cms_content (slug, title, body, version, locale) VALUES
    'ScottsTechX is a marketplace operated by Kato Fred (Uganda). By using this app you agree to buy and sell in good faith. All transactions are between buyer and seller; ScottsTechX provides the platform but does not hold funds. Disputes are resolved through our buyer-protection policy. Refunds are processed within 7 business days. Sellers must ship within 3 days of order confirmation.',
    '1.0', 'en'),
   ('privacy', 'Privacy Policy',
-   'We collect your email, phone number, and location to facilitate transactions. We never sell your data. Your data is encrypted at rest and in transit. You can request deletion of your account at any time via Settings → Account → Delete Account.',
+   'We collect your email, phone number, and location to facilitate transactions. We never sell your data. Your data is encrypted at rest and in transit. You can request deletion of your account at any time via Settings -> Account -> Delete Account.',
    '1.0', 'en'),
   ('about', 'About ScottsTechX',
    'ScottsTechX is a Ugandan e-commerce marketplace founded by Kato Fred, a cybersecurity analyst, web developer, and software developer. Our mission is to empower local sellers across Uganda with a fast, secure, and easy-to-use platform that connects them with buyers nationwide. Built in Uganda, for Uganda.',

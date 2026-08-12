@@ -1,5 +1,6 @@
 package com.scottsx.app.navigation
 
+import java.net.URLDecoder
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,6 +53,25 @@ import com.scottsx.app.ui.screens.SellerStorefrontScreen
 import com.scottsx.app.ui.screens.SignUpScreen
 import com.scottsx.app.ui.screens.SplashScreen
 import com.scottsx.app.ui.screens.MessagesScreen
+import com.scottsx.app.ui.screens.AccountSettingsScreen
+import com.scottsx.app.ui.screens.AddressesScreen
+import com.scottsx.app.ui.screens.PaymentMethodsScreen
+import com.scottsx.app.ui.screens.CmsScreen
+import com.scottsx.app.ui.screens.ContactScreen
+import com.scottsx.app.ui.screens.ReportProblemScreen
+import com.scottsx.app.ui.screens.HelpCenterScreen
+import com.scottsx.app.ui.screens.NotificationSettingsScreen
+import com.scottsx.app.ui.screens.LanguageScreen
+import com.scottsx.app.ui.screens.CurrencyScreen
+import com.scottsx.app.ui.screens.AuditScreen
+import com.scottsx.app.ui.screens.SecurityScreen
+import com.scottsx.app.ui.screens.DeleteAccountScreen
+import com.scottsx.app.ui.screens.MyOrdersScreen
+import com.scottsx.app.ui.screens.TrackOrderScreen
+import com.scottsx.app.ui.screens.RefundsScreen
+import com.scottsx.app.ui.screens.ReturnsScreen
+import com.scottsx.app.ui.screens.SavedProductsScreen
+import com.scottsx.app.ui.screens.SavedSellersScreen
 import com.scottsx.app.ui.screens.NotificationsScreen
 import com.scottsx.app.ui.screens.BecomeSellerScreen
 import com.scottsx.app.ui.screens.StoreSettingsScreen
@@ -540,7 +560,34 @@ fun AppNavigation() {
             StoreSettingsScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.SELLER_PROFILE_SETTINGS) {
-            ProfileSettingsScreen(onBack = { navController.popBackStack() })
+            ProfileSettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenSection = { section ->
+                    when (section) {
+                        "account" -> navController.navigate(Routes.ACCOUNT)
+                        "security" -> navController.navigate(Routes.SECURITY)
+                        "addresses" -> navController.navigate(Routes.ADDRESSES)
+                        "payments" -> navController.navigate(Routes.PAYMENT_METHODS)
+                        "notifications" -> navController.navigate(Routes.NOTIFICATION_PREFS)
+                        "privacy" -> navController.navigate(Routes.PRIVACY)
+                        "language" -> navController.navigate(Routes.LANGUAGE)
+                        "currency" -> navController.navigate(Routes.CURRENCY)
+                        "orders" -> navController.navigate(Routes.MY_ORDERS)
+                        "saved-products" -> navController.navigate(Routes.SAVED_PRODUCTS)
+                        "saved-sellers" -> navController.navigate(Routes.SAVED_SELLERS)
+                        "buyer-protection" -> navController.navigate(Routes.cmsPath("buyer-protection"))
+                        "help" -> navController.navigate(Routes.HELP)
+                        "contact" -> navController.navigate(Routes.CONTACT)
+                        "report" -> navController.navigate(Routes.REPORT)
+                        "terms" -> navController.navigate(Routes.cmsPath("terms"))
+                        "privacy-policy" -> navController.navigate(Routes.cmsPath("privacy"))
+                        "about" -> navController.navigate(Routes.cmsPath("about"))
+                        "audit" -> navController.navigate(Routes.AUDIT)
+                        "delete-account" -> navController.navigate(Routes.DELETE_ACCOUNT)
+                        else -> Unit
+                    }
+                },
+            )
         }
 
         // ---- Stage 4 transactions / receipts / AI personalization ----
@@ -659,6 +706,65 @@ fun AppNavigation() {
                 onOpenProductById = { id -> navController.navigate(Routes.product(id)) },
             )
         }
+
+        // ---- User settings routes ----
+        composable(Routes.ACCOUNT) { AccountSettingsScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.SECURITY) { SecurityScreen(onBack = { navController.popBackStack() }, onSignOut = { navController.navigate(Routes.LOGIN.format(Role.BUYER)) { popUpTo(0) } }) }
+        composable(Routes.ADDRESSES) { AddressesScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.PAYMENT_METHODS) { PaymentMethodsScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.NOTIFICATION_PREFS) { NotificationSettingsScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.LANGUAGE) { LanguageScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.CURRENCY) { CurrencyScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.MY_ORDERS) {
+            MyOrdersScreen(
+                onBack = { navController.popBackStack() },
+                onTrack = { id -> navController.navigate(Routes.TRACK_ORDER.replace("{orderId}", URLEncoder.encode(id, "UTF-8"))) },
+                onOpenReturn = { navController.navigate(Routes.RETURNS) },
+                onOpenRefund = { navController.navigate(Routes.REFUNDS) },
+            )
+        }
+        composable(
+            Routes.TRACK_ORDER,
+            arguments = listOf(navArgument("orderId") { type = NavType.StringType }),
+        ) { backStack ->
+            val id = URLDecoder.decode(backStack.arguments?.getString("orderId") ?: "", "UTF-8")
+            TrackOrderScreen(orderId = id, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SAVED_PRODUCTS) { SavedProductsScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.SAVED_SELLERS) { SavedSellersScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.REFUNDS) { RefundsScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.RETURNS) { ReturnsScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.HELP) {
+            HelpCenterScreen(
+                onBack = { navController.popBackStack() },
+                onContact = { navController.navigate(Routes.CONTACT) },
+                onTerms = { navController.navigate(Routes.cmsPath("terms")) },
+                onPrivacy = { navController.navigate(Routes.cmsPath("privacy")) },
+                onReport = { navController.navigate(Routes.REPORT) },
+            )
+        }
+        composable(Routes.CONTACT) { ContactScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.REPORT) { ReportProblemScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.ABOUT) { CmsScreen(slug = "about", title = "About ScottsTechX", onBack = { navController.popBackStack() }) }
+        composable(Routes.AUDIT) { AuditScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.DELETE_ACCOUNT) { DeleteAccountScreen(onBack = { navController.popBackStack() }, onConfirm = { navController.popBackStack() }) }
+        composable(Routes.PRIVACY) { CmsScreen(slug = "privacy", title = "Privacy Policy", onBack = { navController.popBackStack() }) }
+        composable(
+            Routes.CMS,
+            arguments = listOf(navArgument("slug") { type = NavType.StringType }),
+        ) { backStack ->
+            val slug = backStack.arguments?.getString("slug") ?: ""
+            val title = when (slug) {
+                "terms" -> "Terms of Service"
+                "privacy" -> "Privacy Policy"
+                "about" -> "About ScottsTechX"
+                "help" -> "Help Center"
+                "contact" -> "Contact ScottsTechX"
+                "buyer-protection" -> "Buyer Protection"
+                else -> slug.replaceFirstChar { it.uppercase() }
+            }
+            CmsScreen(slug = slug, title = title, onBack = { navController.popBackStack() })
+        }
     }
 
 }
@@ -776,6 +882,30 @@ object Routes {
     const val MESSAGES = "messages"
     const val NOTIFICATIONS = "notifications"
     const val BECOME_SELLER = "become-seller"
+
+    // ---- User settings sub-routes ----
+    const val ACCOUNT = "settings/account"
+    const val SECURITY = "settings/security"
+    const val ADDRESSES = "settings/addresses"
+    const val PAYMENT_METHODS = "settings/payment-methods"
+    const val NOTIFICATION_PREFS = "settings/notifications"
+    const val PRIVACY = "settings/privacy"
+    const val LANGUAGE = "settings/language"
+    const val CURRENCY = "settings/currency"
+    const val MY_ORDERS = "settings/my-orders"
+    const val TRACK_ORDER = "settings/track-order/{orderId}"
+    const val SAVED_PRODUCTS = "settings/saved-products"
+    const val SAVED_SELLERS = "settings/saved-sellers"
+    const val REFUNDS = "settings/refunds"
+    const val RETURNS = "settings/returns"
+    const val HELP = "settings/help"
+    const val CONTACT = "settings/contact"
+    const val REPORT = "settings/report"
+    const val ABOUT = "settings/about"
+    const val AUDIT = "settings/audit"
+    const val DELETE_ACCOUNT = "settings/delete-account"
+    const val CMS = "settings/cms/{slug}"
+    fun cmsPath(slug: String) = "settings/cms/$slug"
 
     fun transaction(id: String) = "transaction/${URLEncoder.encode(id, "UTF-8")}"
     fun receiptNew() = "receipt/new"

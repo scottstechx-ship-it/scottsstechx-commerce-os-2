@@ -108,6 +108,216 @@ object V2Client {
             parse = { o -> o.optBoolean("ok", false) },
         ) ?: false
 
+    // ============================================================
+    // USER PROFILE / ADDRESSES / PAYMENT METHODS / ETC.
+    // ============================================================
+
+    suspend fun fetchUserProfile(): JSONObject? = apiCall(
+        method = "GET", path = "/api/v1/user/profile", body = null,
+        parse = { o -> o },
+    )
+
+    suspend fun updateUserProfile(patch: JSONObject): Boolean = apiCall(
+        method = "PATCH", path = "/api/v1/user/profile", body = patch,
+        parse = { o -> o.optBoolean("ok", false) },
+    ) ?: false
+
+    suspend fun updateAvatar(avatarUrl: String): Boolean = apiCall(
+        method = "POST",
+        path = "/api/v1/user/profile/avatar",
+        body = JSONObject().put("avatarUrl", avatarUrl),
+        parse = { o -> o.optBoolean("ok", false) },
+    ) ?: false
+
+    // Addresses
+    data class Address(
+        val id: String, val label: String, val recipient: String, val phone: String?,
+        val line1: String, val line2: String?, val city: String, val region: String?,
+        val country: String, val postalCode: String?, val isDefault: Boolean,
+    )
+
+    suspend fun fetchAddresses(): List<Address> {
+        val arr = apiCallArray(method = "GET", path = "/api/v1/user/addresses", body = null, parse = { it }) ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            val a = arr.optJSONObject(i) ?: return@mapNotNull null
+            Address(
+                id = a.optString("id"),
+                label = a.optString("label"),
+                recipient = a.optString("recipient"),
+                phone = a.optString("phone").takeIf { it.isNotBlank() },
+                line1 = a.optString("line1"),
+                line2 = a.optString("line2").takeIf { it.isNotBlank() },
+                city = a.optString("city"),
+                region = a.optString("region").takeIf { it.isNotBlank() },
+                country = a.optString("country"),
+                postalCode = a.optString("postalCode").takeIf { it.isNotBlank() },
+                isDefault = a.optBoolean("isDefault", false),
+            )
+        }
+    }
+
+    suspend fun createAddress(body: JSONObject): String? = apiCall(
+        method = "POST", path = "/api/v1/user/addresses", body = body,
+        parse = { o -> o.optString("id") },
+    )
+
+    suspend fun updateAddress(id: String, body: JSONObject): Boolean = apiCall(
+        method = "PATCH", path = "/api/v1/user/addresses/$id", body = body,
+        parse = { o -> o.optBoolean("ok", false) },
+    ) ?: false
+
+    suspend fun deleteAddress(id: String): Boolean = apiCall(
+        method = "DELETE", path = "/api/v1/user/addresses/$id", body = null,
+        parse = { o -> o.optBoolean("ok", false) },
+    ) ?: false
+
+    // Payment methods
+    data class PaymentMethod(
+        val id: String, val kind: String, val provider: String?, val label: String,
+        val account: String, val isDefault: Boolean, val expiresAt: String?,
+    )
+
+    suspend fun fetchPaymentMethods(): List<PaymentMethod> {
+        val arr = apiCallArray(method = "GET", path = "/api/v1/user/payment-methods", body = null, parse = { it }) ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            val p = arr.optJSONObject(i) ?: return@mapNotNull null
+            PaymentMethod(
+                id = p.optString("id"),
+                kind = p.optString("kind"),
+                provider = p.optString("provider").takeIf { it.isNotBlank() },
+                label = p.optString("label"),
+                account = p.optString("account"),
+                isDefault = p.optBoolean("isDefault", false),
+                expiresAt = p.optString("expiresAt").takeIf { it.isNotBlank() },
+            )
+        }
+    }
+
+    suspend fun createPaymentMethod(body: JSONObject): String? = apiCall(
+        method = "POST", path = "/api/v1/user/payment-methods", body = body,
+        parse = { o -> o.optString("id") },
+    )
+
+    suspend fun deletePaymentMethod(id: String): Boolean = apiCall(
+        method = "DELETE", path = "/api/v1/user/payment-methods/$id", body = null,
+        parse = { o -> o.optBoolean("ok", false) },
+    ) ?: false
+
+    // Saved products
+    suspend fun fetchSavedProducts(): JSONObject? = apiCall(
+        method = "GET", path = "/api/v1/user/saved-products", body = null,
+        parse = { o -> o },
+    )
+
+    suspend fun saveProduct(productId: String): Boolean = apiCall(
+        method = "POST", path = "/api/v1/user/saved-products/$productId", body = null,
+        parse = { o -> o.optBoolean("ok", false) },
+    ) ?: false
+
+    suspend fun unsaveProduct(productId: String): Boolean = apiCall(
+        method = "DELETE", path = "/api/v1/user/saved-products/$productId", body = null,
+        parse = { o -> o.optBoolean("ok", false) },
+    ) ?: false
+
+    // Saved sellers
+    suspend fun fetchSavedSellers(): JSONObject? = apiCall(
+        method = "GET", path = "/api/v1/user/saved-sellers", body = null,
+        parse = { o -> o },
+    )
+
+    suspend fun saveSeller(sellerId: String): Boolean = apiCall(
+        method = "POST", path = "/api/v1/user/saved-sellers/$sellerId", body = null,
+        parse = { o -> o.optBoolean("ok", false) },
+    ) ?: false
+
+    suspend fun unsaveSeller(sellerId: String): Boolean = apiCall(
+        method = "DELETE", path = "/api/v1/user/saved-sellers/$sellerId", body = null,
+        parse = { o -> o.optBoolean("ok", false) },
+    ) ?: false
+
+    // Refunds
+    suspend fun fetchRefunds(): JSONObject? = apiCall(
+        method = "GET", path = "/api/v1/user/refunds", body = null,
+        parse = { o -> o },
+    )
+
+    suspend fun createRefund(body: JSONObject): String? = apiCall(
+        method = "POST", path = "/api/v1/user/refunds", body = body,
+        parse = { o -> o.optString("id") },
+    )
+
+    // Returns
+    suspend fun fetchReturns(): JSONObject? = apiCall(
+        method = "GET", path = "/api/v1/user/returns", body = null,
+        parse = { o -> o },
+    )
+
+    suspend fun createReturn(body: JSONObject): String? = apiCall(
+        method = "POST", path = "/api/v1/user/returns", body = body,
+        parse = { o -> o.optString("id") },
+    )
+
+    // Support tickets
+    suspend fun fetchTickets(): JSONObject? = apiCall(
+        method = "GET", path = "/api/v1/support/tickets", body = null,
+        parse = { o -> o },
+    )
+
+    suspend fun createTicket(category: String, subject: String, message: String, attachmentUrl: String? = null): String? = apiCall(
+        method = "POST", path = "/api/v1/support/tickets",
+        body = JSONObject().apply {
+            put("category", category)
+            put("subject", subject)
+            put("message", message)
+            if (attachmentUrl != null) put("attachmentUrl", attachmentUrl)
+        },
+        parse = { o -> o.optString("id") },
+    )
+
+    // CMS
+    suspend fun fetchCms(slug: String, locale: String = "en"): JSONObject? = apiCall(
+        method = "GET", path = "/api/v1/cms/$slug?locale=$locale", body = null,
+        parse = { o -> o },
+    )
+
+    // Reports
+    suspend fun createReport(
+        resourceType: String, resourceId: String, reason: String,
+        description: String? = null,
+    ): String? = apiCall(
+        method = "POST", path = "/api/v1/reports",
+        body = JSONObject().apply {
+            put("resourceType", resourceType)
+            put("resourceId", resourceId)
+            put("reason", reason)
+            if (description != null) put("description", description)
+        },
+        parse = { o -> o.optString("id") },
+    )
+
+    // Notifications (user-specific)
+    suspend fun fetchNotifications(): JSONObject? = apiCall(
+        method = "GET", path = "/api/v1/user/notifications", body = null,
+        parse = { o -> o },
+    )
+
+    suspend fun markAllNotificationsRead(): Boolean = apiCall(
+        method = "POST", path = "/api/v1/user/notifications/mark-all-read", body = null,
+        parse = { o -> o.optBoolean("ok", false) },
+    ) ?: false
+
+    suspend fun markNotificationRead(id: String): Boolean = apiCall(
+        method = "POST", path = "/api/v1/user/notifications/$id/read", body = null,
+        parse = { o -> o.optBoolean("ok", false) },
+    ) ?: false
+
+    // Audit log
+    suspend fun fetchMyAudit(): JSONObject? = apiCall(
+        method = "GET", path = "/api/v1/audit/me", body = null,
+        parse = { o -> o },
+    )
+
+
     // ----------------------------------------------------------------
     // AI
     // ----------------------------------------------------------------

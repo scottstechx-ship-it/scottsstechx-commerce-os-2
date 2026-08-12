@@ -64,11 +64,11 @@ import kotlinx.coroutines.launch
  * leaving a slim peek of the cinematic background above so the
  * ScottsTechX brand identity carries through.
  *
- * @param role When [Role.Seller], the form is extended with the
+ * @param role When [Role.SELLER], the form is extended with the
  *             extra fields required to register a merchant account:
  *             business name, business type, store location, NIN
  *             (national ID), years in business, and a short bio.
- *             [Role.Buyer] keeps the form short — just name, email,
+ *             [Role.BUYER] keeps the form short — just name, email,
  *             phone, password.
  */
 @Composable
@@ -195,7 +195,7 @@ fun SignUpScreen(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = if (role == Role.Seller)
+                    text = if (role == Role.SELLER)
                         "Tell us a bit about your business — it takes less than a minute."
                     else
                         "It takes less than a minute to join ScottsTechX.",
@@ -233,7 +233,7 @@ fun SignUpScreen(
                 )
 
                 // ============================ Seller-only fields
-                AnimatedVisibility(visible = role == Role.Seller) {
+                AnimatedVisibility(visible = role == Role.SELLER) {
                     Column {
                         Spacer(modifier = Modifier.height(20.dp))
                         SellerSectionHeader("Tell us about your business")
@@ -318,7 +318,7 @@ fun SignUpScreen(
                 PrimaryButton(
                     text = when {
                         loading -> ""
-                        role == Role.Seller -> "Create my Seller account"
+                        role == Role.SELLER -> "Create my Seller account"
                         else -> "Create my Buyer account"
                     },
                     loading = loading,
@@ -342,7 +342,7 @@ fun SignUpScreen(
                             errorMsg = "Passwords do not match."
                             return@PrimaryButton
                         }
-                        if (role == Role.Seller) {
+                        if (role == Role.SELLER) {
                             if (businessName.trim().isEmpty()) {
                                 errorMsg = "Please enter your business name."
                                 return@PrimaryButton
@@ -359,7 +359,7 @@ fun SignUpScreen(
                         errorMsg = null
                         loading = true
                         scope.launch {
-                            val sellerExtras = if (role == Role.Seller) {
+                            val sellerExtras = if (role == Role.SELLER) {
                                 SellerExtras(
                                     businessName = businessName.trim(),
                                     businessType = businessType.displayName,

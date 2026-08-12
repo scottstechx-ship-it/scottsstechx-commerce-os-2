@@ -66,7 +66,7 @@ import kotlinx.coroutines.launch
  * Slides up from the bottom, leaving a slim peek of the cinematic
  * background above so the ScottsTechX brand identity carries through.
  *
- * @param role [Role.Buyer] or [Role.Seller] — controls the copy
+ * @param role [Role.BUYER] or [Role.SELLER] — controls the copy
  *            and the badge shown at the top of the panel.
  */
 @Composable
@@ -198,7 +198,7 @@ fun LoginScreen(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = if (role == Role.Seller)
+                    text = if (role == Role.SELLER)
                         "Pick up where you left off — your customers are waiting."
                     else
                         "Your next opportunity is one tap away.",
@@ -259,7 +259,7 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 PrimaryButton(
-                    text = if (role == Role.Seller) "Login to my Seller account" else "Login",
+                    text = if (role == Role.SELLER) "Login to my Seller account" else "Login",
                     loading = loading,
                     onClick = {
                         if (email.isBlank()) {
@@ -415,7 +415,7 @@ fun LoginScreen(
                     horizontalArrangement = Arrangement.Center,
                 ) {
                     Text(
-                        text = if (role == Role.Seller)
+                        text = if (role == Role.SELLER)
                             "New to selling? "
                         else
                             "New here? ",
@@ -423,7 +423,7 @@ fun LoginScreen(
                         fontSize = 13.sp,
                     )
                     Text(
-                        text = if (role == Role.Seller)
+                        text = if (role == Role.SELLER)
                             "Create a Seller account"
                         else
                             "Create your ScottsTechX account",

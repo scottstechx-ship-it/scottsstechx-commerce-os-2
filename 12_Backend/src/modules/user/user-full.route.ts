@@ -876,7 +876,7 @@ export async function registerUserFullRoute(app: FastifyInstance): Promise<void>
   // NOTIFICATIONS
   // -----------------------------------------------------------------
   app.get(
-    "/api/v1/notifications",
+    "/api/v1/user/notifications",
     { preHandler: requireAuthAny },
     async (request, reply) => {
       const u = getAuthUser(request);
@@ -902,7 +902,7 @@ export async function registerUserFullRoute(app: FastifyInstance): Promise<void>
   );
 
   app.post(
-    "/api/v1/notifications/mark-all-read",
+    "/api/v1/user/notifications/mark-all-read",
     { preHandler: requireAuthAny },
     async (request, reply) => {
       const u = getAuthUser(request);
@@ -916,7 +916,7 @@ export async function registerUserFullRoute(app: FastifyInstance): Promise<void>
   );
 
   app.post(
-    "/api/v1/notifications/:id/read",
+    "/api/v1/user/notifications/:id/read",
     { preHandler: requireAuthAny },
     async (request, reply) => {
       const u = getAuthUser(request);
