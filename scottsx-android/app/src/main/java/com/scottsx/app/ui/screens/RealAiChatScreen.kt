@@ -26,7 +26,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -163,7 +163,7 @@ fun RealAiChatScreen(
                 }
             }
 
-            HorizontalDivider(color = ScottsTechXColors.Divider)
+            Divider(color = ScottsTechXColors.Divider)
 
             LazyColumn(
                 state = listState,
@@ -194,7 +194,7 @@ fun RealAiChatScreen(
                 }
             }
 
-            HorizontalDivider(color = ScottsTechXColors.Divider)
+            Divider(color = ScottsTechXColors.Divider)
             Row(
                 Modifier.fillMaxWidth().padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
