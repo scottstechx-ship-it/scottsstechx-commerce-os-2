@@ -553,7 +553,7 @@ fun AppNavigation() {
         composable(Routes.SELLER_MESSAGES) {
             SellerMessagesScreen(
                 onBack = { navController.popBackStack() },
-                onOpenThread = { threadId -> navController.navigate(Routes.thread("tech-hub", null)) },
+                onOpenThread = { conversationId, peerName -> navController.navigate(Routes.thread("tech-hub", null)) },
             )
         }
         composable(Routes.SELLER_ANALYTICS) {

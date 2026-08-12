@@ -21,7 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scottsx.app.data.domain.SessionCache
-import com.scottsx.app.data.Session
 import com.scottsx.app.data.remote.V2Client
 import com.scottsx.app.ui.theme.ScottsTechXColors
 import kotlinx.coroutines.launch
@@ -37,15 +36,14 @@ fun SellerMessagesScreen(
     onBack: () -> Unit,
     onOpenThread: (conversationId: String, peerName: String) -> Unit,
 ) {
-    val ctx = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
+        val scope = rememberCoroutineScope()
     var conversations by remember { mutableStateOf<List<org.json.JSONObject>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         scope.launch {
             loading = true
-            val me = Session.current(ctx)
+            val me = SessionCache.userIdOrNull().orEmpty()
             // Real backend: GET /api/v1/chat/v2/conversations returns all
             // conversations; filter to ones where I am a participant.
             val arr = try {
@@ -137,8 +135,7 @@ private fun EmptyMessagesHint() {
 
 @Composable
 private fun ConversationRow(convo: org.json.JSONObject, onClick: () -> Unit) {
-    val ctx = androidx.compose.ui.platform.LocalContext.current
-    val me = Session.current(ctx)
+        val me = SessionCache.userIdOrNull().orEmpty()
     val otherId = if (convo.optString("buyerId") == me.id) convo.optString("sellerId") else convo.optString("buyerId")
     val otherName = convo.optString("otherPartyName", otherId.take(8))
     val lastMsg = convo.optString("lastMessage", "New conversation")
