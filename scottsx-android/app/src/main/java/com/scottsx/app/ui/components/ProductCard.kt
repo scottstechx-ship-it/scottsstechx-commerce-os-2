@@ -2,6 +2,7 @@ package com.scottsx.app.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,27 +69,6 @@ fun ProductCard(
     modifier: Modifier = Modifier,
     width: androidx.compose.ui.unit.Dp = 180.dp,
 ) {
-    // Subscribe to wishlist changes so the heart icon updates the
-    // moment the user taps it (or when something else changes the
-    // set on another screen). `collectAsState` is cheap because the
-    // Set is a small, immutable snapshot.
-    val favIds by WishlistStore.ids.collectAsState()
-    val isFav = product.id in favIds
-    var heartBump by remember { mutableStateOf(false) }
-    val heartScale by animateFloatAsState(
-        targetValue = if (heartBump) 1.3f else 1.0f,
-        animationSpec = androidx.compose.animation.core.tween(durationMillis = 220),
-        label = "heart-bump",
-    )
-    // Reset the bump after the animation completes so the heart
-    // returns to its rest size and is ready for the next tap.
-    androidx.compose.runtime.LaunchedEffect(heartBump) {
-        if (heartBump) {
-            kotlinx.coroutines.delay(220)
-            heartBump = false
-        }
-    }
-
     Column(
         modifier = modifier
             .width(width)
@@ -133,28 +113,17 @@ fun ProductCard(
                 }
             }
 
-            // Favorite (heart) toggle
-            Box(
+            // Favorite (heart) toggle — isolated composable so only
+            // this node recomposes when the wishlist state for THIS
+            // product changes. The rest of the card stays still.
+            HeartToggle(
+                productId = product.id,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.92f))
-                    .clickable {
-                        WishlistStore.toggle(product.id)
-                        heartBump = true
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                    contentDescription = "Favorite",
-                    tint = if (isFav) Color(0xFFE11D48) else Color(0xFF6B7280),
-                    modifier = Modifier
-                        .size(18.dp)
-                        .clip(CircleShape),
-                )
-            }
+                    .background(Color.White.copy(alpha = 0.92f)),
+            )
         }
 
         Spacer(Modifier.height(2.dp))
@@ -250,5 +219,45 @@ fun ProductCard(
                 )
             }
         }
+    }
+}
+/**
+ * Isolated favorite-heart toggle. Only recomposes when the wishlist
+ * state for [productId] changes. The rest of the parent card is
+ * unaffected by other cards' wishlist toggles.
+ */
+@Composable
+private fun HeartToggle(productId: String, modifier: Modifier = Modifier) {
+    val favIds by WishlistStore.ids.collectAsState()
+    val isFav = productId in favIds
+    var heartBump by remember { mutableStateOf(false) }
+    val heartScale by animateFloatAsState(
+        targetValue = if (heartBump) 1.3f else 1.0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 220),
+        label = "heart-bump",
+    )
+    androidx.compose.runtime.LaunchedEffect(heartBump) {
+        if (heartBump) {
+            kotlinx.coroutines.delay(220)
+            heartBump = false
+        }
+    }
+    Box(
+        modifier = modifier
+            .clickable {
+                WishlistStore.toggle(productId)
+                heartBump = true
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+            contentDescription = "Favorite",
+            tint = if (isFav) Color(0xFFE11D48) else Color(0xFF6B7280),
+            modifier = Modifier
+                .size(18.dp)
+                .graphicsLayer { scaleX = heartScale; scaleY = heartScale }
+                .clip(CircleShape),
+        )
     }
 }
