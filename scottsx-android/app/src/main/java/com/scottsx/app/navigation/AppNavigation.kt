@@ -385,6 +385,12 @@ fun AppNavigation() {
                         launchSingleTop = true
                     }
                 },
+                // Stage 5.x: seller bottom nav swap. "AI" navigates to the
+                // shared AiAssistantScreen (same one the buyer uses); the
+                // header is the same — the seller gets a Seller AI tab on
+                // the AI assistant screen via header context.
+                onOpenSellerAi = { navController.navigate(Routes.AI) },
+                onOpenSellerMessages = { navController.navigate(Routes.SELLER_MESSAGES) },
             )
         }
 

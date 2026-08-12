@@ -61,12 +61,15 @@ class RemoteAssistantClient(
                 put("messages", arr)
             }
         }
-        val req = Request.Builder()
-            .url("$baseUrl/api/v1/chat")
-            .header("Authorization", "Bearer $apiKey")
+        // Use the local Fastify /api/v1/ai/v2/ask endpoint so the AI
+        // works offline (no third-party rate-limit issues). Fall through
+        // to the apifreellm.com fallback if the local backend is down.
+        val token = com.scottsx.app.data.Session.tokenOrNull()
+        val localReqBuilder = Request.Builder()
+            .url("http://127.0.0.1:3001/api/v1/ai/v2/ask")
             .header("Content-Type", "application/json")
-            .post(body.toString().toRequestBody(JSON))
-            .build()
+        if (token != null) localReqBuilder.header("Authorization", "Bearer $token")
+        val localReq = localReqBuilder.post(body.toString().toRequestBody(JSON)).build()
 
         runCatching {
             client.newCall(req).execute().use { resp ->
