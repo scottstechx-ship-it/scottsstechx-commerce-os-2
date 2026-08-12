@@ -136,7 +136,7 @@ private fun EmptyMessagesHint() {
 @Composable
 private fun ConversationRow(convo: org.json.JSONObject, onClick: () -> Unit) {
         val me = SessionCache.userIdOrNull().orEmpty()
-    val otherId = if (convo.optString("buyerId") == me.id) convo.optString("sellerId") else convo.optString("buyerId")
+    val otherId = if (convo.optString("buyerId") == me) convo.optString("sellerId") else convo.optString("buyerId")
     val otherName = convo.optString("otherPartyName", otherId.take(8))
     val lastMsg = convo.optString("lastMessage", "New conversation")
     val lastTime = convo.optString("lastMessageAt", "")
