@@ -1,6 +1,9 @@
 package com.scottsx.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -166,6 +169,8 @@ fun BuyerHomeScreen(
                         )
                         .padding(top = 32.dp, bottom = 18.dp),
                 ) {
+                    // Header content is shifted right to leave room for the
+                    // hamburger button on the left (so they never overlap).
                     BuyerHeader(
                         displayName = profile.displayName,
                         email = profile.email,
@@ -173,9 +178,11 @@ fun BuyerHomeScreen(
                         cartCount = cartCount,
                         onNotificationsClick = { /* Stage 2 — notifications */ },
                         onCartClick = onNavigateToCart,
+                        modifier = Modifier.padding(start = 60.dp), // clear hamburger zone
                     )
                     // Hamburger button (top-left). Anchored absolute on top of
                     // the header so the dashboard layout below is untouched.
+                    // The header content is padded 60dp to keep them separate.
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopStart)
@@ -352,10 +359,7 @@ fun BuyerHomeScreen(
         }
 
         // 10. Sidebar overlay (Stage 3.1). Always rendered but only
-        //     visible when [sidebarOpen] is true. The bottom nav is
-        //     drawn AFTER the overlay so the user can still tap Home
-        //     / Nearby / AI / Wishlist / Profile even when the drawer
-        //     is open — the drawer never covers the bottom nav.
+        //     visible when [sidebarOpen] is true.
         BuyerSidebarOverlay(
             open = sidebarOpen,
             onDismiss = { sidebarOpen = false },
@@ -367,20 +371,26 @@ fun BuyerHomeScreen(
             },
         )
 
-        // 9. Floating bottom nav — rendered LAST so the sidebar
-        //     overlay never covers it.
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
+        // 9. Floating bottom nav — hidden when the side drawer is open
+        //     so the user can never tap a tab behind the drawer.
+        AnimatedVisibility(
+            visible = !sidebarOpen,
+            enter = fadeIn(animationSpec = tween(180)),
+            exit = fadeOut(animationSpec = tween(180)),
         ) {
-            ScottsTechXBottomBar(
-                selected = bottomTab,
-                onSelect = { tab ->
-                    bottomTab = tab
-                    onTabSelect(tab)
-                },
-            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth(),
+            ) {
+                ScottsTechXBottomBar(
+                    selected = bottomTab,
+                    onSelect = { tab ->
+                        bottomTab = tab
+                        onTabSelect(tab)
+                    },
+                )
+            }
         }
 
         // 11. Theme selector sheet — pinned at the bottom; tap any row
