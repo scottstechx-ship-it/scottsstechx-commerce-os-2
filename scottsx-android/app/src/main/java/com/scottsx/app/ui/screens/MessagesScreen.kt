@@ -187,7 +187,7 @@ fun MessagesScreen(
                     color = ScottsTechXColors.OnLight,
                     fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 Spacer(Modifier.height(8.dp))
-                MarketplaceDataSource.sellers.take(20).forEach { seller ->
+                MarketplaceDataSource.allSellers.take(20).forEach { seller ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

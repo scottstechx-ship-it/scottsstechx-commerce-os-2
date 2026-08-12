@@ -39,7 +39,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scottsx.app.ui.theme.ScottsTechXColors
-import com.scottsx.app.ui.util.formatTodayLabel
 
 /**
  * Stage 5.x — Notifications inbox.

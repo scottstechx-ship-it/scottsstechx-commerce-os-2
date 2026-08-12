@@ -542,10 +542,14 @@ object MarketplaceDataSource {
         return listOf(me) + altSellers
     }
 
-    private fun sellersExcluding(id: String): List<Seller> =
-        listOf(sellerTechHub, sellerFashionHouse, sellerSneakerKing, sellerHomeAppliances,
-               sellerGlamour, sellerSporting, sellerPearlFresh, sellerAutoParts, sellerUgandaCrafts)
-            .filter { it.id != id }
+    /** All distinct seller storefronts in the marketplace. */
+    val allSellers: List<Seller> = listOf(
+        sellerTechHub, sellerFashionHouse, sellerSneakerKing, sellerHomeAppliances,
+        sellerGlamour, sellerSporting, sellerPearlFresh, sellerAutoParts, sellerUgandaCrafts,
+    )
+
+    fun sellersExcluding(id: String): List<Seller> =
+        allSellers.filter { it.id != id }
 
     // ----- Public query helpers -----
 
