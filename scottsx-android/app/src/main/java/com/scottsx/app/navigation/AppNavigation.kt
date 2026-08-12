@@ -1,114 +1,5 @@
 package com.scottsx.app.navigation
 
-
-object Routes {
-    const val SPLASH = "splash"
-    const val ONBOARDING = "onboarding"
-    const val ROLE = "role"
-    const val LOGIN = "login/{role}"
-    const val SIGNUP = "signup/{role}"
-    const val WRONG_ROLE = "wrongRole/{picked}/{actual}"
-    const val HOME = "home/{role}"
-    const val BUYER_HOME = "buyer_home/{displayName}/{email}"
-    const val SELLER_HOME = "seller_home/{displayName}/{email}"
-    const val CART = "cart"
-    const val NEARBY = "nearby"
-    const val AI = "ai"
-    const val SEARCH = "search"
-    const val CATEGORIES = "categories"
-    const val WISHLIST = "wishlist"
-    const val PROFILE = "profile/{displayName}/{email}"
-
-    // ---- Stage 3 product discovery routes ----
-    const val PRODUCT = "product/{productId}"
-    const val STOREFRONT = "storefront/{sellerId}"
-    const val REVIEWS = "reviews/{productId}"
-    const val THREAD = "thread/{sellerId}/{productId}"
-    // ---- Stage 3 seller side routes ----
-    const val SELLER_ORDERS = "seller/orders"
-    const val SELLER_ADD_PRODUCT = "seller/add-product"
-    const val SELLER_MESSAGES = "seller/messages"
-    const val SELLER_ANALYTICS = "seller/analytics"
-    const val SELLER_TOOLS = "seller/marketplace-tools"
-    const val SELLER_STORE_SETTINGS = "seller/store-settings"
-    const val SELLER_PROFILE_SETTINGS = "seller/profile-settings"
-
-    // ---- Stage 4 transaction / receipt / AI routes ----
-    const val TRANSACTIONS = "transactions"
-    const val TRANSACTION_DETAIL = "transaction/{transactionId}"
-    const val RECEIPT_NEW = "receipt/new"
-    const val RECEIPT_NEW_FOR_TX = "receipt/new/{transactionId}"
-    const val RECEIPT_PREVIEW = "receipt/preview/{receiptNumber}"
-    const val RECEIPTS_HISTORY = "receipts"
-    const val DISPUTE = "dispute/{transactionId}"
-    const val AI_PERSONALIZATION = "ai/personalization"
-    const val NEARBY_MAP = "nearby/map"
-    const val AGREEMENT_PROPOSAL = "agreement/new/{productId}"
-    const val SETTINGS = "settings"
-
-    // ---- Stage 5.x communications routes ----
-    const val MESSAGES = "messages"
-    const val NOTIFICATIONS = "notifications"
-    const val BECOME_SELLER = "become-seller"
-
-    fun transaction(id: String) = "transaction/${URLEncoder.encode(id, "UTF-8")}"
-    fun receiptNew() = "receipt/new"
-    fun receiptNewForTx(id: String) = "receipt/new/${URLEncoder.encode(id, "UTF-8")}"
-    fun receiptPreview(num: String) = "receipt/preview/${URLEncoder.encode(num, "UTF-8")}"
-    fun dispute(id: String) = "dispute/${URLEncoder.encode(id, "UTF-8")}"
-    fun agreementNew(productId: String) = "agreement/new/${URLEncoder.encode(productId, "UTF-8")}"
-
-    fun product(id: String) = "product/${URLEncoder.encode(id, "UTF-8")}"
-    fun storefront(id: String) = "storefront/${URLEncoder.encode(id, "UTF-8")}"
-    fun reviews(id: String) = "reviews/${URLEncoder.encode(id, "UTF-8")}"
-    fun thread(sellerId: String, productId: String? = null) =
-        "thread/${URLEncoder.encode(sellerId, "UTF-8")}/${URLEncoder.encode(productId ?: "", "UTF-8")}"
-
-    fun login(role: Role) = "login/${role.name}"
-    fun signup(role: Role) = "signup/${role.name}"
-    fun home(role: Role) = "home/${role.name}"
-    fun wrongRole(picked: Role, actual: Role) = "wrongRole/${picked.name}/${actual.name}"
-    /**
-     * Build the dashboard route for the given [role]. Falls back to
-     * "Buyer" / "Seller" / a single non-empty placeholder when
-     * SessionCache fields are empty so the resulting path always
-     * matches the registered route shape
-     * `buyer_home/{displayName}/{email}` or
-     * `seller_home/{displayName}/{email}`.
-     *
-     * Without this guard, an empty display name / email yields
-     * `"buyer_home/Buyer/"` (trailing slash) which Navigation
-     * Compose rejects with IllegalArgumentException "cannot be
-     * found in the navigation graph".
-     */
-    fun dashboard(role: Role): String = when (role) {
-        Role.BUYER -> buyerHome(
-            com.scottsx.app.data.domain.BuyerProfile(
-                uid = "",
-                displayName = SessionCache.displayName ?: "Buyer",
-                email = SessionCache.email ?: "buyer",
-            ),
-        )
-        Role.SELLER -> sellerHome(
-            displayName = SessionCache.displayName ?: "Seller",
-            email = SessionCache.email ?: "seller",
-        )
-    }
-
-    fun sellerHome(displayName: String, email: String): String =
-        "seller_home/" +
-            java.net.URLEncoder.encode(displayName.ifBlank { "Seller" }, "UTF-8") +
-            "/" +
-            java.net.URLEncoder.encode(email.ifBlank { "seller" }, "UTF-8")
-    fun buyerHome(profile: com.scottsx.app.data.domain.BuyerProfile) =
-        "buyer_home/${profile.displayName}/" +
-            java.net.URLEncoder.encode(profile.email, "UTF-8")
-
-    fun roleFromBackStack(s: String?): Role =
-        if (s.equals("Seller", true)) Role.SELLER else Role.BUYER
-}
-
-
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -160,12 +51,12 @@ import com.scottsx.app.ui.screens.SellerOrdersScreen
 import com.scottsx.app.ui.screens.SellerStorefrontScreen
 import com.scottsx.app.ui.screens.SignUpScreen
 import com.scottsx.app.ui.screens.SplashScreen
-import com.scottsx.app.ui.screens.StoreSettingsScreen
-import com.scottsx.app.ui.screens.WishlistScreen
-import com.scottsx.app.ui.screens.WrongRoleScreen
 import com.scottsx.app.ui.screens.MessagesScreen
 import com.scottsx.app.ui.screens.NotificationsScreen
 import com.scottsx.app.ui.screens.BecomeSellerScreen
+import com.scottsx.app.ui.screens.StoreSettingsScreen
+import com.scottsx.app.ui.screens.WishlistScreen
+import com.scottsx.app.ui.screens.WrongRoleScreen
 import com.scottsx.app.ui.screens.SettingsScreen
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
@@ -394,9 +285,6 @@ fun AppNavigation() {
                 onNavigateToMessages = { navController.navigate(Routes.MESSAGES) },
                 onNavigateToNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
                 onNavigateToSellerCenter = {
-                    // Open the seller dashboard — the app keeps the
-                    // buyer's nav stack under it so they can navigate
-                    // back to the buyer side via Settings.
                     navController.navigate(Routes.SELLER_HOME +
                         "/${java.net.URLEncoder.encode(profile.displayName.ifBlank { "Seller" }, "UTF-8")}/" +
                         "${java.net.URLEncoder.encode(profile.email.ifBlank { "seller" }, "UTF-8")}")
@@ -736,7 +624,6 @@ fun AppNavigation() {
         }
 
         composable(Routes.SETTINGS) {
-        composable(Routes.SETTINGS) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onOpenAiPersonalization = { navController.navigate(Routes.AI_PERSONALIZATION) },
@@ -758,13 +645,13 @@ fun AppNavigation() {
             BecomeSellerScreen(
                 onBack = { navController.popBackStack() },
                 onUpgraded = {
-                    // After upgrade bounce the user to the seller dashboard.
                     navController.navigate(Routes.dashboard(Role.SELLER)) {
                         popUpTo(Routes.BUYER_HOME) { inclusive = true }
                     }
                 },
             )
         }
+
         composable(Routes.NEARBY_MAP) {
             NearbyMapScreen(
                 onBack = { navController.popBackStack() },
@@ -840,3 +727,109 @@ private fun SplashHost(onContinue: () -> Unit) {
     SplashScreen(onContinue = onContinue)
 }
 
+object Routes {
+    const val SPLASH = "splash"
+    const val ONBOARDING = "onboarding"
+    const val ROLE = "role"
+    const val LOGIN = "login/{role}"
+    const val SIGNUP = "signup/{role}"
+    const val WRONG_ROLE = "wrongRole/{picked}/{actual}"
+    const val HOME = "home/{role}"
+    const val BUYER_HOME = "buyer_home/{displayName}/{email}"
+    const val SELLER_HOME = "seller_home/{displayName}/{email}"
+    const val CART = "cart"
+    const val NEARBY = "nearby"
+    const val AI = "ai"
+    const val SEARCH = "search"
+    const val CATEGORIES = "categories"
+    const val WISHLIST = "wishlist"
+    const val PROFILE = "profile/{displayName}/{email}"
+
+    // ---- Stage 3 product discovery routes ----
+    const val PRODUCT = "product/{productId}"
+    const val STOREFRONT = "storefront/{sellerId}"
+    const val REVIEWS = "reviews/{productId}"
+    const val THREAD = "thread/{sellerId}/{productId}"
+    // ---- Stage 3 seller side routes ----
+    const val SELLER_ORDERS = "seller/orders"
+    const val SELLER_ADD_PRODUCT = "seller/add-product"
+    const val SELLER_MESSAGES = "seller/messages"
+    const val SELLER_ANALYTICS = "seller/analytics"
+    const val SELLER_TOOLS = "seller/marketplace-tools"
+    const val SELLER_STORE_SETTINGS = "seller/store-settings"
+    const val SELLER_PROFILE_SETTINGS = "seller/profile-settings"
+
+    // ---- Stage 4 transaction / receipt / AI routes ----
+    const val TRANSACTIONS = "transactions"
+    const val TRANSACTION_DETAIL = "transaction/{transactionId}"
+    const val RECEIPT_NEW = "receipt/new"
+    const val RECEIPT_NEW_FOR_TX = "receipt/new/{transactionId}"
+    const val RECEIPT_PREVIEW = "receipt/preview/{receiptNumber}"
+    const val RECEIPTS_HISTORY = "receipts"
+    const val DISPUTE = "dispute/{transactionId}"
+    const val AI_PERSONALIZATION = "ai/personalization"
+    const val NEARBY_MAP = "nearby/map"
+    const val AGREEMENT_PROPOSAL = "agreement/new/{productId}"
+    const val SETTINGS = "settings"
+
+    // ---- Stage 5.x communications routes ----
+    const val MESSAGES = "messages"
+    const val NOTIFICATIONS = "notifications"
+    const val BECOME_SELLER = "become-seller"
+
+    fun transaction(id: String) = "transaction/${URLEncoder.encode(id, "UTF-8")}"
+    fun receiptNew() = "receipt/new"
+    fun receiptNewForTx(id: String) = "receipt/new/${URLEncoder.encode(id, "UTF-8")}"
+    fun receiptPreview(num: String) = "receipt/preview/${URLEncoder.encode(num, "UTF-8")}"
+    fun dispute(id: String) = "dispute/${URLEncoder.encode(id, "UTF-8")}"
+    fun agreementNew(productId: String) = "agreement/new/${URLEncoder.encode(productId, "UTF-8")}"
+
+    fun product(id: String) = "product/${URLEncoder.encode(id, "UTF-8")}"
+    fun storefront(id: String) = "storefront/${URLEncoder.encode(id, "UTF-8")}"
+    fun reviews(id: String) = "reviews/${URLEncoder.encode(id, "UTF-8")}"
+    fun thread(sellerId: String, productId: String? = null) =
+        "thread/${URLEncoder.encode(sellerId, "UTF-8")}/${URLEncoder.encode(productId ?: "", "UTF-8")}"
+
+    fun login(role: Role) = "login/${role.name}"
+    fun signup(role: Role) = "signup/${role.name}"
+    fun home(role: Role) = "home/${role.name}"
+    fun wrongRole(picked: Role, actual: Role) = "wrongRole/${picked.name}/${actual.name}"
+    /**
+     * Build the dashboard route for the given [role]. Falls back to
+     * "Buyer" / "Seller" / a single non-empty placeholder when
+     * SessionCache fields are empty so the resulting path always
+     * matches the registered route shape
+     * `buyer_home/{displayName}/{email}` or
+     * `seller_home/{displayName}/{email}`.
+     *
+     * Without this guard, an empty display name / email yields
+     * `"buyer_home/Buyer/"` (trailing slash) which Navigation
+     * Compose rejects with IllegalArgumentException "cannot be
+     * found in the navigation graph".
+     */
+    fun dashboard(role: Role): String = when (role) {
+        Role.BUYER -> buyerHome(
+            com.scottsx.app.data.domain.BuyerProfile(
+                uid = "",
+                displayName = SessionCache.displayName ?: "Buyer",
+                email = SessionCache.email ?: "buyer",
+            ),
+        )
+        Role.SELLER -> sellerHome(
+            displayName = SessionCache.displayName ?: "Seller",
+            email = SessionCache.email ?: "seller",
+        )
+    }
+
+    fun sellerHome(displayName: String, email: String): String =
+        "seller_home/" +
+            java.net.URLEncoder.encode(displayName.ifBlank { "Seller" }, "UTF-8") +
+            "/" +
+            java.net.URLEncoder.encode(email.ifBlank { "seller" }, "UTF-8")
+    fun buyerHome(profile: com.scottsx.app.data.domain.BuyerProfile) =
+        "buyer_home/${profile.displayName}/" +
+            java.net.URLEncoder.encode(profile.email, "UTF-8")
+
+    fun roleFromBackStack(s: String?): Role =
+        if (s.equals("Seller", true)) Role.SELLER else Role.BUYER
+}
