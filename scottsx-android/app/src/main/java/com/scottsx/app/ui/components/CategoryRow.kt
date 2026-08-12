@@ -69,7 +69,7 @@ fun CategoryRow(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         ordered.forEach { cat ->
             CategoryChip(
@@ -108,13 +108,13 @@ private fun CategoryChip(
 
     Column(
         modifier = Modifier
-            .width(74.dp)
+            .width(64.dp)
             .clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             modifier = Modifier
-                .size(58.dp)
+                .size(46.dp)
                 .clip(CircleShape)
                 .background(iconBgBrush)
                 .padding(if (selected) 1.dp else 1.dp),
@@ -124,15 +124,15 @@ private fun CategoryChip(
                 imageVector = categoryIconFor(category),
                 contentDescription = category.displayName,
                 tint = iconTint,
-                modifier = Modifier.size(26.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(5.dp))
         Text(
             text = category.displayName,
             color = labelColor,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             maxLines = 1,
         )
     }

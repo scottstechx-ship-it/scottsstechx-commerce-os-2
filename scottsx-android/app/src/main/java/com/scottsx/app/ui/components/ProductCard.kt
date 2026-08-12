@@ -67,14 +67,26 @@ fun ProductCard(
     modifier: Modifier = Modifier,
     width: androidx.compose.ui.unit.Dp = 180.dp,
 ) {
-    val isFav by remember(product.id) {
-        mutableStateOf(WishlistStore.contains(product.id))
-    }
+    // Subscribe to wishlist changes so the heart icon updates the
+    // moment the user taps it (or when something else changes the
+    // set on another screen). `collectAsState` is cheap because the
+    // Set is a small, immutable snapshot.
+    val favIds by WishlistStore.ids.collectAsState()
+    val isFav = product.id in favIds
     var heartBump by remember { mutableStateOf(false) }
     val heartScale by animateFloatAsState(
         targetValue = if (heartBump) 1.3f else 1.0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 220),
         label = "heart-bump",
     )
+    // Reset the bump after the animation completes so the heart
+    // returns to its rest size and is ready for the next tap.
+    androidx.compose.runtime.LaunchedEffect(heartBump) {
+        if (heartBump) {
+            kotlinx.coroutines.delay(220)
+            heartBump = false
+        }
+    }
 
     Column(
         modifier = modifier

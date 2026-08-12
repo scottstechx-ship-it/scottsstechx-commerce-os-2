@@ -129,7 +129,7 @@ fun CategoriesScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(56.dp)
+                                    .size(46.dp)
                                     .clip(CircleShape)
                                     .background(
                                         Brush.linearGradient(
@@ -142,7 +142,7 @@ fun CategoriesScreen(
                                     imageVector = iconFor(cat),
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(28.dp),
+                                    modifier = Modifier.size(22.dp),
                                 )
                             }
                             Spacer(Modifier.size(8.dp))
