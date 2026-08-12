@@ -157,10 +157,13 @@ fun BuyerHomeScreen(
                 .padding(bottom = 88.dp),  // leave room for floating nav
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp),
         ) {
-            // 1. Header — gradient backdrop with a hamburger button overlaid
-            //    in the top-left so the buyer can open the side drawer.
+            // 1. Header — gradient backdrop split into two rows:
+            //    Row 1: Hamburger (left) + brand spacer
+            //    Row 2: BuyerHeader (avatar + welcome text + notification/cart)
+            //    The hamburger and the avatar/welcome text are stacked
+            //    vertically so they never overlap.
             item {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
@@ -173,6 +176,32 @@ fun BuyerHomeScreen(
                         )
                         .padding(top = 32.dp, bottom = 18.dp),
                 ) {
+                    // Top utility bar — hamburger only, leaves the rest
+                    // of the surface for the header content below.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.18f))
+                                .clickable { sidebarOpen = true },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Menu,
+                                contentDescription = "Open menu",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    // Avatar + welcome text row (the original BuyerHeader).
                     BuyerHeader(
                         displayName = profile.displayName,
                         email = profile.email,
@@ -181,25 +210,6 @@ fun BuyerHomeScreen(
                         onNotificationsClick = { /* Stage 2 — notifications */ },
                         onCartClick = onNavigateToCart,
                     )
-                    // Hamburger button (top-left). Anchored absolute on top of
-                    // the header so the dashboard layout below is untouched.
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(start = 12.dp, top = 6.dp)
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.18f))
-                            .clickable { sidebarOpen = true },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Menu,
-                            contentDescription = "Open menu",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
                 }
             }
 
