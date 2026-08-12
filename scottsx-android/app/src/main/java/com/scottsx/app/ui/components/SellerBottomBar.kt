@@ -180,8 +180,8 @@ private fun SellerNavItem(
 /** The five seller tabs. The Add tab is reserved for the FAB. */
 enum class SellerBottomTab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Filled.Home),
-    Orders("Orders", Icons.Filled.Receipt),
-    Add("Add", Icons.Filled.Add),
+    Add("Add", Icons.Filled.AddCircle),
+    AI("AI Assistant", Icons.Filled.AutoAwesome),
     Messages("Messages", Icons.Filled.ChatBubble),
     Analytics("Analytics", Icons.Filled.Analytics),
 }

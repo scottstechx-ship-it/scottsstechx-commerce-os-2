@@ -126,6 +126,8 @@ fun SellerHomeScreen(
     onNavigateToSettings: () -> Unit = {},
     onSwitchToBuyer: () -> Unit = {},
     onSignOut: () -> Unit = {},
+    onOpenSellerAi: () -> Unit = {},
+    onOpenSellerMessages: () -> Unit = {},
 ) {
     val themePref = LocalThemePreference.current
     val themeMode by themePref.themeState()
@@ -248,9 +250,9 @@ fun SellerHomeScreen(
                     bottomTab = tab
                     when (tab) {
                         SellerBottomTab.Home -> Unit
-                        SellerBottomTab.Orders -> onManageOrders()
                         SellerBottomTab.Add -> onAddProduct()
-                        SellerBottomTab.Messages -> Unit
+                        SellerBottomTab.AI -> onOpenSellerAi()
+                        SellerBottomTab.Messages -> onOpenSellerMessages()
                         SellerBottomTab.Analytics -> onOpenAnalytics()
                     }
                 },
