@@ -52,11 +52,11 @@ fun SellerMessagesScreen(
             conversations = buildList {
                 if (arr != null) {
                     for (i in 0 until arr.length()) {
-                        val c = arr.optJSONObject(i) ?: continue
-                        val sellerId = c.optString("sellerId")
-                        val buyerId = c.optString("buyerId")
-                        if (me.id == sellerId || me.id == buyerId) {
-                            add(c)
+                        val convo = arr.optJSONObject(i) ?: continue
+                        val sellerId = convo.optString("sellerId")
+                        val buyerId = convo.optString("buyerId")
+                        if (me == sellerId || me == buyerId) {
+                            add(convo)
                         }
                     }
                 }
