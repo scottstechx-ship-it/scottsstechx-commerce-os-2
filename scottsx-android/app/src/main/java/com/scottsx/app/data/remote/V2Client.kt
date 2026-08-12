@@ -143,6 +143,19 @@ object V2Client {
         val sellerName = o.optString("sellerBusinessName").ifEmpty { "ScottsTechX Seller" }
         val priceUgx = o.optLong("priceMinor", 0L)
         val imageUrl = o.optString("imageUrl").takeIf { it.isNotBlank() } ?: ""
+        // Seller data class signature: id, name, rating, location, verified
+        // The Seller.fullConstructorWithStoreName extension wraps this with extra data.
+        val seller = com.scottsx.app.data.domain.Seller(
+            id = sellerId,
+            name = sellerName,
+            rating = 4.5f,
+            location = "Kampala",
+            verified = true,
+        )
+        val brand = com.scottsx.app.data.domain.Brand(
+            id = "default",
+            name = "Generic",
+        )
         return com.scottsx.app.data.domain.Product(
             id = o.optString("id"),
             name = title,
@@ -151,17 +164,8 @@ object V2Client {
             priceUgx = priceUgx,
             oldPriceUgx = null,
             category = category,
-            brand = com.scottsx.app.data.domain.Brand.Generic,
-            seller = com.scottsx.app.data.domain.Seller(
-                id = sellerId,
-                displayName = sellerName,
-                storeName = sellerName,
-                rating = 4.5f,
-                productCount = 0,
-                location = "Kampala",
-                latitude = 0.3476,
-                longitude = 32.5825,
-            ),
+            brand = brand,
+            seller = seller,
             imageUrl = imageUrl,
             stock = o.optInt("stockQuantity", 1),
             rating = o.optDouble("productTrustScore", 4.4).toFloat(),

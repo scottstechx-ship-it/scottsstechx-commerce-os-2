@@ -115,6 +115,7 @@ fun BuyerHomeScreen(
     // Fetch live products from the backend (so new seller uploads
     // appear in the buyer feed). Falls back to the static
     // MarketplaceDataSource if the network call fails or returns empty.
+    val scope = rememberCoroutineScope()
     var apiProducts by remember { mutableStateOf<List<com.scottsx.app.data.domain.Product>>(emptyList()) }
     var apiLoaded by remember { mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(Unit) {

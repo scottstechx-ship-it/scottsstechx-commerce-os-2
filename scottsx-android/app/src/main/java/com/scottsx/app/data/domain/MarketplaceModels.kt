@@ -53,6 +53,18 @@ enum class ProductCategory(val displayName: String, val icon: String) {
     companion object {
         fun fromKey(s: String?): ProductCategory =
             values().firstOrNull { it.name.equals(s, true) } ?: All
+
+        fun fromApiName(s: String?): ProductCategory? {
+            if (s.isNullOrBlank()) return null
+            values().firstOrNull { it.name.equals(s, true) || it.displayName.equals(s, true) }?.let { return it }
+            return when (s.lowercase()) {
+                "home", "home & living", "home &living", "home&living", "home and living" -> HomeLiving
+                "footwear", "shoes", "sneakers" -> Sports
+                "grocery", "groceries", "food" -> Groceries
+                "car", "cars", "vehicle", "vehicles", "auto" -> Automotive
+                else -> null
+            }
+        }
     }
 }
 
@@ -109,6 +121,18 @@ sealed class BannerBackground {
     object DarkNavy : BannerBackground()
     object GreenTeal : BannerBackground()
     object Sunset : BannerBackground()
+        fun fromApiName(s: String?): ProductCategory? {
+            if (s.isNullOrBlank()) return null
+            values().firstOrNull { it.name.equals(s, true) || it.displayName.equals(s, true) }?.let { return it }
+            return when (s.lowercase()) {
+                "home", "home & living", "home &living", "home&living", "home and living" -> HomeLiving
+                "footwear", "shoes", "sneakers" -> Sports
+                "grocery", "groceries", "food" -> Groceries
+                    "car", "cars", "vehicle", "vehicles", "auto" -> Automotive
+                else -> null
+            }
+        }
+
 }
 
 data class CartItem(

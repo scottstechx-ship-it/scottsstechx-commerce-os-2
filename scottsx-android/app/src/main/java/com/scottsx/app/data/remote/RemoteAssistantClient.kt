@@ -72,7 +72,7 @@ class RemoteAssistantClient(
         val localReq = localReqBuilder.post(body.toString().toRequestBody(JSON)).build()
 
         runCatching {
-            client.newCall(req).execute().use { resp ->
+            client.newCall(localReq).execute().use { resp ->
                 val raw = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) {
                     Log.w(TAG, "HTTP ${resp.code}: $raw")
@@ -85,7 +85,7 @@ class RemoteAssistantClient(
                     val msg = json.optString("error", "Unknown error")
                     return@use Result.LocalFallback(reason = msg)
                 }
-                val reply = json.optString("response").ifBlank { json.optString("reply") }
+                val reply = json.optString("reply").ifBlank { json.optString("response") }
                 if (reply.isBlank()) return@use Result.LocalFallback(reason = "Empty reply")
                 Result.Remote(reply = reply, provider = json.optString("provider"))
             }
