@@ -54,6 +54,9 @@ import com.scottsx.app.ui.screens.SplashScreen
 import com.scottsx.app.ui.screens.StoreSettingsScreen
 import com.scottsx.app.ui.screens.WishlistScreen
 import com.scottsx.app.ui.screens.WrongRoleScreen
+import com.scottsx.app.ui.screens.MessagesScreen
+import com.scottsx.app.ui.screens.NotificationsScreen
+import com.scottsx.app.ui.screens.BecomeSellerScreen
 import com.scottsx.app.ui.screens.SettingsScreen
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
@@ -279,6 +282,17 @@ fun AppNavigation() {
                 onNavigateToTransactions = { navController.navigate(Routes.TRANSACTIONS) },
                 onNavigateToReceipts = { navController.navigate(Routes.RECEIPTS_HISTORY) },
                 onNavigateToAiPersonalization = { navController.navigate(Routes.AI_PERSONALIZATION) },
+                onNavigateToMessages = { navController.navigate(Routes.MESSAGES) },
+                onNavigateToNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
+                onNavigateToSellerCenter = {
+                    // Open the seller dashboard — the app keeps the
+                    // buyer's nav stack under it so they can navigate
+                    // back to the buyer side via Settings.
+                    navController.navigate(Routes.SELLER_HOME +
+                        "/${java.net.URLEncoder.encode(profile.displayName.ifBlank { "Seller" }, "UTF-8")}/" +
+                        "${java.net.URLEncoder.encode(profile.email.ifBlank { "seller" }, "UTF-8")}")
+                },
+                onNavigateToBecomeSeller = { navController.navigate(Routes.BECOME_SELLER) },
                 onOpenProduct = { p: com.scottsx.app.data.domain.Product -> navController.navigate(Routes.product(p.id)) },
                 onOpenStore = { sid -> navController.navigate(Routes.storefront(sid)) },
                 onTabSelect = { tab: BottomTab -> onBuyerTab(navController, tab) },
@@ -613,9 +627,33 @@ fun AppNavigation() {
         }
 
         composable(Routes.SETTINGS) {
+        composable(Routes.SETTINGS) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onOpenAiPersonalization = { navController.navigate(Routes.AI_PERSONALIZATION) },
+            )
+        }
+        composable(Routes.MESSAGES) {
+            MessagesScreen(
+                onBack = { navController.popBackStack() },
+                onOpenThread = { sellerId, _ -> navController.navigate(Routes.thread(sellerId, null)) },
+            )
+        }
+        composable(Routes.NOTIFICATIONS) {
+            NotificationsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenProduct = { id -> navController.navigate(Routes.product(id)) },
+            )
+        }
+        composable(Routes.BECOME_SELLER) {
+            BecomeSellerScreen(
+                onBack = { navController.popBackStack() },
+                onUpgraded = {
+                    // After upgrade bounce the user to the seller dashboard.
+                    navController.navigate(Routes.dashboard(Role.SELLER)) {
+                        popUpTo(Routes.BUYER_HOME) { inclusive = true }
+                    }
+                },
             )
         }
         composable(Routes.NEARBY_MAP) {
@@ -737,6 +775,11 @@ object Routes {
     const val NEARBY_MAP = "nearby/map"
     const val AGREEMENT_PROPOSAL = "agreement/new/{productId}"
     const val SETTINGS = "settings"
+
+    // ---- Stage 5.x communications routes ----
+    const val MESSAGES = "messages"
+    const val NOTIFICATIONS = "notifications"
+    const val BECOME_SELLER = "become-seller"
 
     fun transaction(id: String) = "transaction/${URLEncoder.encode(id, "UTF-8")}"
     fun receiptNew() = "receipt/new"

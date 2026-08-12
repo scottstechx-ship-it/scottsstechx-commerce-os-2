@@ -91,6 +91,24 @@ object V2Client {
     }
 
     // ----------------------------------------------------------------
+    // Auth helpers
+    // ----------------------------------------------------------------
+
+    /**
+     * Promote the current buyer to a seller. The backend requires a
+     * verified email — if the caller hasn't verified yet, the
+     * server returns 403 email_not_verified. The caller can recover
+     * by triggering the email verification flow and retrying.
+     */
+    suspend fun upgradeToSeller(): Boolean =
+        apiCall(
+            method = "POST",
+            path = "/api/v1/auth/firebase/upgrade-to-seller",
+            body = JSONObject(),
+            parse = { o -> o.optBoolean("ok", false) },
+        ) ?: false
+
+    // ----------------------------------------------------------------
     // AI
     // ----------------------------------------------------------------
 
@@ -370,6 +388,46 @@ object V2Client {
                 attachmentMime = m.optString("attachmentMime").takeIf { it.isNotBlank() },
                 threadParentId = m.optString("threadParentId").takeIf { it.isNotBlank() },
                 createdAt = m.optString("createdAt"),
+            )
+        }
+    }
+
+    /**
+     * Inbox summary — the caller's conversations with the most recent
+     * message preview, unread count, and the other party's display
+     * name. Used by the MessagesScreen sidebar destination.
+     */
+    data class Conversation(
+        val conversationId: String,
+        val otherPartyId: String,
+        val otherPartyDisplayName: String,
+        val productId: String?,
+        val productTitle: String?,
+        val productImageUrl: String?,
+        val lastMessagePreview: String?,
+        val lastMessageAt: String?,
+        val unreadCount: Int,
+    )
+
+    suspend fun fetchConversations(): List<Conversation> {
+        val arr = apiCallArray(
+            method = "GET",
+            path = "/api/v1/chat/v2/conversations",
+            body = null,
+            parse = { it },
+        ) ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            val r = arr.optJSONObject(i) ?: return@mapNotNull null
+            Conversation(
+                conversationId = r.optString("conversation_id"),
+                otherPartyId = r.optString("other_party_id"),
+                otherPartyDisplayName = r.optString("other_party_display_name").ifBlank { "Seller" },
+                productId = r.optString("product_id").takeIf { it.isNotBlank() },
+                productTitle = r.optString("product_title").takeIf { it.isNotBlank() },
+                productImageUrl = r.optString("product_image_url").takeIf { it.isNotBlank() },
+                lastMessagePreview = r.optString("last_message_preview").takeIf { it.isNotBlank() },
+                lastMessageAt = r.optString("last_message_at").takeIf { it.isNotBlank() },
+                unreadCount = r.optInt("unread_count", 0),
             )
         }
     }

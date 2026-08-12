@@ -100,6 +100,10 @@ fun BuyerHomeScreen(
     onNavigateToTransactions: () -> Unit = {},
     onNavigateToReceipts: () -> Unit = {},
     onNavigateToAiPersonalization: () -> Unit = {},
+    onNavigateToMessages: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
+    onNavigateToSellerCenter: () -> Unit = {},
+    onNavigateToBecomeSeller: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onOpenProduct: (com.scottsx.app.data.domain.Product) -> Unit = {},
     onOpenStore: (String) -> Unit = {},
@@ -131,10 +135,10 @@ fun BuyerHomeScreen(
             SidebarDestination.Transactions -> onNavigateToTransactions()
             SidebarDestination.Receipts -> onNavigateToReceipts()
             SidebarDestination.AiPersonalization -> onNavigateToAiPersonalization()
-            SidebarDestination.Messages -> { /* TODO 3.1.1 — open Messages */ }
-            SidebarDestination.Notifications -> { /* TODO 3.1.1 — open Notifications */ }
-            SidebarDestination.SellerCenter -> { /* TODO 3.1.1 — seller dashboard */ }
-            SidebarDestination.BecomeSeller -> { /* TODO 3.1.1 — upgrade CTA */ }
+            SidebarDestination.Messages -> onNavigateToMessages()
+            SidebarDestination.Notifications -> onNavigateToNotifications()
+            SidebarDestination.SellerCenter -> onNavigateToSellerCenter()
+            SidebarDestination.BecomeSeller -> onNavigateToBecomeSeller()
             SidebarDestination.Settings -> onNavigateToSettings()
             SidebarDestination.Theme -> themeSheetOpen = true
             SidebarDestination.Logout -> logoutDialogOpen = true
