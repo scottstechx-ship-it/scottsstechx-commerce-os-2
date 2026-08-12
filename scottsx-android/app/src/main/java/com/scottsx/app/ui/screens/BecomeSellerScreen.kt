@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,7 +67,7 @@ fun BecomeSellerScreen(
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
     val themePref = remember(ctx) { ThemePreference.get(ctx) }
-    val themeMode by themePref.themeState()
+    val themeMode = themePref.themeFlow.collectAsState().value
     val isDark = themeMode == ThemeMode.DARK
     var isUpgrading by remember { mutableStateOf(false) }
     var upgradeError by remember { mutableStateOf<String?>(null) }
