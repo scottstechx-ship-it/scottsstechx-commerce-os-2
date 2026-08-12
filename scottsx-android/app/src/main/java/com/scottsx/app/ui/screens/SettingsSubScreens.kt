@@ -24,6 +24,7 @@ import com.scottsx.app.ui.components.SettingsSectionHeader
 import com.scottsx.app.ui.theme.ScottsTechXColors
 import kotlinx.coroutines.launch
 import org.json.JSONArray
+import org.json.JSONObject
 
 @Composable
 fun NotificationSettingsScreen(onBack: () -> Unit) {
