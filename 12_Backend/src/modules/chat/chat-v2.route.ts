@@ -260,6 +260,68 @@ export async function registerChatV2Route(app: FastifyInstance): Promise<void> {
       reply.send({ ok: true });
     },
   );
+
+  // -----------------------------------------------------------------
+  // GET /api/v1/chat/v2/conversations/:cid/messages
+  //   Returns all messages in the conversation, ordered oldest first.
+  //   Used by the Android client to hydrate a thread and to poll for
+  //   new messages every few seconds (combined with `since` for delta).
+  app.get(
+    "/api/v1/chat/v2/conversations/:cid/messages",
+    { preHandler: requireAuthAny },
+    async (request, reply) => {
+      const u = getAuthUser(request);
+      const routeParams = request.params as { cid: string };
+      const q = request.query as { since?: string; limit?: string };
+      const limit = Math.min(Math.max(parseInt(q.limit ?? "100", 10) || 100, 1), 500);
+      const rows = await withTransaction(
+        { userId: u.id, role: u.role },
+        async (c) => {
+          const qParams: unknown[] = [u.id, routeParams.cid];
+          let sql = `SELECT id, sender_user_id, recipient_user_id, role, content,
+                            session_id, attachment_url, attachment_mime,
+                            thread_parent_id, created_at
+                       FROM chat_messages
+                      WHERE session_id = $2
+                        AND deleted_at IS NULL
+                        AND (sender_user_id = $1 OR recipient_user_id = $1)`;
+          if (q.since) {
+            sql += ` AND created_at > $3`;
+            qParams.push(q.since);
+          }
+          sql += ` ORDER BY created_at ASC LIMIT $${qParams.length + 1}`;
+          qParams.push(limit);
+          const res = await c.query<{
+            id: string;
+            sender_user_id: string;
+            recipient_user_id: string | null;
+            role: string;
+            content: string;
+            session_id: string;
+            attachment_url: string | null;
+            attachment_mime: string | null;
+            thread_parent_id: string | null;
+            created_at: string;
+          }>(sql, qParams);
+          return res.rows;
+        },
+      );
+      reply.send(
+        rows.map((m) => ({
+          id: m.id,
+          conversationId: m.session_id,
+          senderUid: m.sender_user_id,
+          recipientUid: m.recipient_user_id,
+          content: m.content,
+          role: m.role,
+          attachmentUrl: m.attachment_url,
+          attachmentMime: m.attachment_mime,
+          threadParentId: m.thread_parent_id,
+          createdAt: m.created_at,
+        })),
+      );
+    },
+  );
 }
 
 async function deriveOtherParty(

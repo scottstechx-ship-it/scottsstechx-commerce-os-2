@@ -35,7 +35,102 @@ const setImageSchema = z.object({
   alt: z.string().max(200).optional(),
 });
 
+const createProductSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(4000).optional().default(""),
+  priceMinor: z.number().int().nonnegative(),
+  currency: z.string().length(3).optional().default("UGX"),
+  stock: z.number().int().nonnegative().optional().default(0),
+  category: z.string().max(80).optional(),
+  imageUrl: z.string().url().max(2000).optional(),
+  imageGsPath: z.string().max(500).optional(),
+  sku: z.string().max(80).optional(),
+});
+
 export async function registerProductsV2Route(app: FastifyInstance): Promise<void> {
+  // -----------------------------------------------------------------
+  // POST /api/v1/products/v2/create
+  //   Body: { title, description?, priceMinor, currency?, stock?,
+  //           category?, imageUrl?, imageGsPath?, sku? }
+  //   Returns: { id } on success.
+  //   The caller must be a seller (or admin). The product is created
+  //   against the caller's seller_profiles row.
+  app.post(
+    "/api/v1/products/v2/create",
+    { preHandler: requireAuthAny },
+    async (request, reply) => {
+      const u = getAuthUser(request);
+      if (u.role !== "seller" && u.role !== "admin") {
+        reply.status(403).send({ error: "seller_only" });
+        return;
+      }
+      const body = createProductSchema.parse(request.body);
+      const pool = getPool();
+      // Resolve the caller's seller_profiles.user_id
+      let sellerUserId = u.id;
+      if (u.role === "admin" && (request.body as { sellerId?: string }).sellerId) {
+        sellerUserId = (request.body as { sellerId: string }).sellerId;
+      }
+      // Ensure the seller_profiles row exists
+      const own = await pool.query<{ user_id: string }>(
+        `SELECT user_id FROM seller_profiles WHERE user_id = $1`,
+        [sellerUserId],
+      );
+      if (own.rows.length === 0) {
+        reply.status(400).send({ error: "no_seller_profile" });
+        return;
+      }
+      const inserted = await withTransaction(
+        { userId: u.id, role: u.role },
+        async (c) => {
+          const ins = await c.query<{ id: string }>(
+            `INSERT INTO products
+               (seller_id, title, description, price_minor, currency,
+                stock_quantity, category, image_url, image_url_signed, sku,
+                is_active)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)
+             RETURNING id`,
+            [
+              sellerUserId,
+              body.title,
+              body.description ?? "",
+              body.priceMinor,
+              body.currency,
+              body.stock ?? 0,
+              body.category ?? null,
+              body.imageUrl ?? null,
+              body.imageGsPath ?? null,
+              body.sku ?? null,
+            ],
+          );
+          return ins.rows[0]!;
+        },
+      );
+      // Mirror to Firestore
+      try {
+        await mirrorToCollection("products", inserted.id, {
+          id: inserted.id,
+          sellerId: sellerUserId,
+          title: body.title,
+          description: body.description ?? "",
+          priceMinor: body.priceMinor,
+          currency: body.currency,
+          stock: body.stock ?? 0,
+          category: body.category ?? null,
+          imageUrl: body.imageUrl ?? null,
+          imageUrlSigned: body.imageGsPath ?? null,
+          sku: body.sku ?? null,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        app.log.warn({ err: (err as Error).message }, "firestore product mirror failed");
+      }
+      reply.send({ id: inserted.id, ok: true });
+    },
+  );
+
   // -----------------------------------------------------------------
   app.post(
     "/api/v1/products/v2/upload-image-url",

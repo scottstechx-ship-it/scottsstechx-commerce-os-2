@@ -337,6 +337,43 @@ object V2Client {
             },
         )
 
+    /**
+     * Fetch all messages in a conversation. Used by [MessageStream] to
+     * hydrate the thread and to poll for new messages (the Android
+     * client compares `createdAt` against the last seen timestamp).
+     */
+    suspend fun fetchMessages(
+        conversationId: String,
+        since: String? = null,
+        limit: Int = 100,
+    ): List<ChatMessage> {
+        val qs = buildString {
+            append("?limit=").append(limit)
+            if (since != null) append("&since=").append(java.net.URLEncoder.encode(since, "UTF-8"))
+        }
+        val arr = apiCallArray(
+            method = "GET",
+            path = "/api/v1/chat/v2/conversations/$conversationId/messages$qs",
+            body = null,
+            parse = { it },
+        ) ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            val m = arr.optJSONObject(i) ?: return@mapNotNull null
+            ChatMessage(
+                id = m.optString("id"),
+                conversationId = m.optString("conversationId"),
+                senderUid = m.optString("senderUid"),
+                recipientUid = m.optString("recipientUid").takeIf { it.isNotBlank() },
+                content = m.optString("content"),
+                role = m.optString("role"),
+                attachmentUrl = m.optString("attachmentUrl").takeIf { it.isNotBlank() },
+                attachmentMime = m.optString("attachmentMime").takeIf { it.isNotBlank() },
+                threadParentId = m.optString("threadParentId").takeIf { it.isNotBlank() },
+                createdAt = m.optString("createdAt"),
+            )
+        }
+    }
+
     data class ChatUploadHandle(
         val uploadUrl: String,
         val gsPath: String,
@@ -410,4 +447,35 @@ object V2Client {
             body = JSONObject().put("gsPath", gsPath),
             parse = { o -> o.optBoolean("ok", false) },
         ) ?: false
+
+    /**
+     * Create a new product owned by the caller. The caller must be a
+     * seller (or admin). On success returns the new product's UUID.
+     */
+    suspend fun createProduct(
+        title: String,
+        priceMinor: Long,
+        description: String? = null,
+        currency: String = "UGX",
+        stock: Int = 0,
+        category: String? = null,
+        imageUrl: String? = null,
+        imageGsPath: String? = null,
+        sku: String? = null,
+    ): String? = apiCall(
+        method = "POST",
+        path = "/api/v1/products/v2/create",
+        body = JSONObject().apply {
+            put("title", title)
+            put("priceMinor", priceMinor)
+            if (description != null) put("description", description)
+            put("currency", currency)
+            put("stock", stock)
+            if (category != null) put("category", category)
+            if (imageUrl != null) put("imageUrl", imageUrl)
+            if (imageGsPath != null) put("imageGsPath", imageGsPath)
+            if (sku != null) put("sku", sku)
+        },
+        parse = { o -> o.optString("id") },
+    )
 }

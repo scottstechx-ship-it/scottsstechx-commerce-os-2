@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import com.scottsx.app.data.preferences.LocalThemePreference
 import com.scottsx.app.data.preferences.ThemePreference
@@ -27,6 +28,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             val themePref = remember { ThemePreference.get(applicationContext) }
+            // Stage 5: cross-device theme sync — pull the saved theme
+            // from /api/v1/settings/v2 on first frame so a new
+            // device picks up the user's choice.
+            LaunchedEffect(Unit) {
+                themePref.loadFromServer()
+            }
             CompositionLocalProvider(
                 LocalColorContext provides ColorContext.Dark,
                 LocalThemePreference provides themePref,

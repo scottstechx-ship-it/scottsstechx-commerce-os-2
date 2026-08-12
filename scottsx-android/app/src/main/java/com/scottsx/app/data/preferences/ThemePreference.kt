@@ -48,6 +48,23 @@ class ThemePreference private constructor(private val prefs: SharedPreferences) 
         _themeFlow.value = mode
     }
 
+    /**
+     * Load the user's theme preference from the backend
+     * (PUT /api/v1/settings/v2) and apply it locally. This is the
+     * cross-device sync hook — when the user signs in on a new phone
+     * the theme they chose on the old one is restored.
+     *
+     * Returns true if the remote value was applied, false if no
+     * remote settings were available (offline / unauthenticated).
+     */
+    suspend fun loadFromServer(): Boolean {
+        val s = com.scottsx.app.data.remote.V2Client.loadSettings() ?: return false
+        val mode = runCatching { ThemeMode.valueOf(s.theme.uppercase()) }
+            .getOrDefault(ThemeMode.SYSTEM)
+        set(mode)
+        return true
+    }
+
     companion object {
         private const val PREFS = "scottsx_prefs"
         private const val KEY = "theme_mode"
@@ -127,4 +144,4 @@ fun sidebarPaletteFor(mode: ThemeMode): SidebarPalette {
 }
 
 /** Convenience: should the seller center entry be shown for the current session? */
-fun SessionCache.isSeller(): Boolean = role == Role.Seller
+fun SessionCache.isSeller(): Boolean = role == Role.SELLER

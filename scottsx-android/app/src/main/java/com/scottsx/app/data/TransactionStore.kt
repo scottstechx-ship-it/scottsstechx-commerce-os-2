@@ -187,15 +187,17 @@ object TransactionStore {
         )
         agreements[idx] = updated
         if (important) {
-            timelineEvents.add(
-                TimelineEvent(
-                    transactionId = updated.id,
-                    type = TimelineEventType.AGREEMENT_PROPOSED,
-                    byRole = updatedByRole,
-                    note = "Revision $nextRevNum",
-                )
+            val ev = TimelineEvent(
+                transactionId = updated.id,
+                type = TimelineEventType.AGREEMENT_PROPOSED,
+                byRole = updatedByRole,
+                note = "Revision $nextRevNum",
             )
+            timelineEvents.add(ev)
+            Mirror.timelineEvent(ev, updated.id)
         }
+        // Mirror updated agreement to Firestore
+        Mirror.transaction(updated)
         return updated
     }
 
@@ -407,6 +409,8 @@ object TransactionStore {
             sellerSignatureLabel = sellerDisplayName,
         )
         receipts.add(r)
+        // Mirror to Firestore
+        Mirror.receipt(r)
         return r
     }
 
@@ -568,6 +572,8 @@ object TransactionStore {
             note = note,
         )
         timelineEvents.add(e)
+        // Mirror to Firestore
+        Mirror.timelineEvent(e, transactionId)
         return e
     }
 

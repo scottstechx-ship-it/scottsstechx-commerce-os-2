@@ -48,6 +48,8 @@ import com.scottsx.app.ui.components.PrimaryButton
 import com.scottsx.app.ui.theme.ScottsTechXColors
 import com.scottsx.app.data.remote.V2Client
 import com.scottsx.app.data.domain.SessionCache
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 
 /**
  * Add a new product. Three steps:
@@ -76,6 +78,7 @@ fun AddProductScreen(
     var newImageUrl by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     var isUploading by remember { mutableStateOf(false) }
+    val ctx = LocalContext.current
 
     Column(modifier = Modifier.fillMaxSize().background(ScottsTechXColors.PanelLight)) {
         Row(
@@ -190,6 +193,7 @@ fun AddProductScreen(
                         com.scottsx.app.ui.components.InputField(
                             value = newImageUrl,
                             onValueChange = { newImageUrl = it },
+                            label = "Image URL",
                             placeholder = "Paste image URL (Firebase Storage)",
                             modifier = Modifier.weight(1f),
                         )
@@ -258,19 +262,66 @@ fun AddProductScreen(
             }
             PrimaryButton(
                 text = if (step == 2) "Save Product" else "Next",
+                enabled = !isUploading,
+                loading = isUploading,
                 onClick = {
                     if (step == 2) {
+                        // Validation: name and price are required
+                        if (name.isBlank() || priceText.isBlank()) {
+                            android.widget.Toast.makeText(
+                                ctx, "Name and price are required", android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                            return@PrimaryButton
+                        }
+                        val priceUgx = priceText.toLongOrNull() ?: 0L
+                        val stock = stockText.toIntOrNull() ?: 0
+                        val discount = discountText.toIntOrNull() ?: 0
+                        val firstImage = imageUrls.firstOrNull()
+                        val productName = name.trim()
+                        val productDesc = description.trim()
                         scope.launch {
                             isUploading = true
-                            // Products v2 route: real Firestore mirror happens server-side.
-                            // Image URLs are already Gson-valid remote URLs (Firebase Storage gs://... or https://).
-                            android.util.Log.i("AddProduct", "saved: $name / $category / UGX $priceText / ${imageUrls.size} images")
-                            // Fire-and-forget: signal the user's intent + record quick action
-                            V2Client.recordSignal("category", category.name)
-                            isUploading = false
-                            onSaved()
+                            try {
+                                // Real backend: POST /api/v1/products/v2/create
+                                val newId = V2Client.createProduct(
+                                    title = productName,
+                                    priceMinor = priceUgx,
+                                    description = productDesc,
+                                    currency = "UGX",
+                                    stock = stock,
+                                    category = category.name,
+                                    imageUrl = firstImage,
+                                )
+                                if (newId != null) {
+                                    android.util.Log.i("AddProduct", "created id=$newId")
+                                    V2Client.recordSignal("category", category.name)
+                                    android.widget.Toast.makeText(
+                                        ctx, "Product saved", android.widget.Toast.LENGTH_SHORT,
+                                    ).show()
+                                    onSaved()
+                                } else {
+                                    android.widget.Toast.makeText(
+                                        ctx, "Save failed — check connection", android.widget.Toast.LENGTH_LONG,
+                                    ).show()
+                                }
+                            } catch (t: Throwable) {
+                                android.util.Log.w("AddProduct", "save failed", t)
+                                android.widget.Toast.makeText(
+                                    ctx, "Save error: ${t.message}", android.widget.Toast.LENGTH_LONG,
+                                ).show()
+                            } finally {
+                                isUploading = false
+                            }
                         }
-                    } else step++
+                    } else {
+                        if (step == 0 && name.isBlank()) {
+                            android.widget.Toast.makeText(
+                                ctx, "Enter a product name", android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                            return@PrimaryButton
+                        }
+                        step++
+                    }
                 },
                 modifier = Modifier.weight(1.4f),
             )
