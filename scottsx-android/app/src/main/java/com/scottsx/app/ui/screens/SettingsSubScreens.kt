@@ -160,7 +160,12 @@ fun AuditScreen(onBack: () -> Unit) {
         scope.launch {
             val arr = V2Client.fetchMyAudit()
             items.clear()
-            if (arr != null) for (i in 0 until arr.length()) items.add(arr.getJSONObject(i))
+            if (arr != null) {
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.optJSONObject(i) ?: continue
+                        items.add(obj)
+                    }
+                }
             loading = false
         }
     }
