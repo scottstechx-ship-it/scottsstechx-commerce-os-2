@@ -33,12 +33,12 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun MyOrdersScreen(onBack: () -> Unit, onTrack: (String) -> Unit, onOpenReturn: (String) -> Unit, onOpenRefund: (String) -> Unit) {
-    val transactions by TransactionStore.transactions.collectAsState()
+    val agreements by TransactionStore.agreements.collectAsState()
     SettingsScaffold(title = "My Orders", onBack = onBack) {
-        if (transactions.isEmpty()) {
+        if (agreements.isEmpty()) {
             SettingsBlankHint("You haven't placed any orders yet.")
         } else {
-            transactions.forEach { tx ->
+            agreements.forEach { ag ->
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -49,16 +49,16 @@ fun MyOrdersScreen(onBack: () -> Unit, onTrack: (String) -> Unit, onOpenReturn: 
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Order #${tx.id.takeLast(6).uppercase()}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text("Amount: ${tx.totalLabel}", fontSize = 12.sp, color = ScottsTechXColors.OnLightSecondary)
-                            Text("Status: ${tx.status.name.replace('_', ' ')}", fontSize = 12.sp, color = ScottsTechXColors.BluePrimary)
+                            Text("Order #${ag.id.takeLast(6).uppercase()}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Product: ${ag.revisions.lastOrNull()?.productName ?: "N/A"}", fontSize = 12.sp, color = ScottsTechXColors.OnLightSecondary)
+                            Text("Status: ${ag.status.name}", fontSize = 12.sp, color = ScottsTechXColors.BluePrimary)
                         }
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Track", color = ScottsTechXColors.BluePrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { onTrack(tx.id) })
-                        Text("Return", color = ScottsTechXColors.BluePrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { onOpenReturn(tx.id) })
-                        Text("Refund", color = Color(0xFFDC2626), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { onOpenRefund(tx.id) })
+                        Text("Track", color = ScottsTechXColors.BluePrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { onTrack(ag.id) })
+                        Text("Return", color = ScottsTechXColors.BluePrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { onOpenReturn(ag.id) })
+                        Text("Refund", color = Color(0xFFDC2626), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { onOpenRefund(ag.id) })
                     }
                 }
             }
@@ -69,8 +69,8 @@ fun MyOrdersScreen(onBack: () -> Unit, onTrack: (String) -> Unit, onOpenReturn: 
 /** Track a single order — shows event timeline + ETA. */
 @Composable
 fun TrackOrderScreen(orderId: String, onBack: () -> Unit) {
-    val transactions by TransactionStore.transactions.collectAsState()
-    val tx = transactions.firstOrNull { it.id == orderId }
+    val agreements by TransactionStore.agreements.collectAsState()
+    val tx = agreements.firstOrNull { it.id == orderId }
     SettingsScaffold(title = "Track Order", onBack = onBack) {
         if (tx == null) {
             SettingsBlankHint("Order not found.")
@@ -84,12 +84,18 @@ fun TrackOrderScreen(orderId: String, onBack: () -> Unit) {
                 .padding(16.dp),
         ) {
             Text("Order #${tx.id.takeLast(6).uppercase()}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Text(tx.totalLabel, fontSize = 14.sp, color = ScottsTechXColors.BluePrimary, fontWeight = FontWeight.SemiBold)
+            Text(tx.status.label, fontSize = 14.sp, color = ScottsTechXColors.BluePrimary, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(12.dp))
-            Text("Status: ${tx.status.name.replace('_', ' ')}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Spacer(Modifier.height(8.dp))
-            // Simple event timeline
-            listOf("Placed" to true, "Confirmed" to true, "Shipped" to tx.status.name != "PLACED", "Delivered" to tx.status.name == "DELIVERED" || tx.status.name == "COMPLETED").forEach { (stage, done) ->
+            val isDone = { status: TransactionStatus ->
+                status == TransactionStatus.COMPLETED || status == TransactionStatus.CONFIRMED || status == TransactionStatus.IN_PROGRESS
+            }
+            val placed = true
+            val confirmed = tx.status == TransactionStatus.CONFIRMED || tx.status == TransactionStatus.IN_PROGRESS || tx.status == TransactionStatus.COMPLETED
+            val shipped = tx.status == TransactionStatus.IN_PROGRESS || tx.status == TransactionStatus.COMPLETED
+            val delivered = tx.status == TransactionStatus.COMPLETED
+            listOf<Pair<String, Boolean>>("Placed" to placed, "Confirmed" to confirmed, "Shipped" to shipped, "Delivered" to delivered).forEach { pair ->
+                val stage = pair.first
+                val done = pair.second
                 Row(
                     modifier = Modifier.padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
