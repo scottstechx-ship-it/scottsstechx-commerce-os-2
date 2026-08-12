@@ -86,6 +86,7 @@ import { registerChatV2Route } from "./modules/chat/chat-v2.route.js";
 import { registerProductsV2Route } from "./modules/products/products-v2.route.js";
 import { registerNearbyV2Route } from "./modules/sellers/nearby-v2.route.js";
 import { registerAiV2Route } from "./modules/ai/ai-v2.route.js";
+import { registerUserFullRoute } from "./modules/user/user-full.route.js";
 import { registerSettingsV2Route } from "./modules/settings/settings-v2.route.js";
 import { registerMemoryV2Route } from "./modules/memory/memory-v2.route.js";
 
@@ -177,6 +178,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   registerNearbyV2Route(app)
   registerAiV2Route(app)
   registerSettingsV2Route(app)
+  registerUserFullRoute(app)
   registerMemoryV2Route(app);
   await registerCartRoute(app);
   // Capture the raw request body for the Stripe webhook so signature
