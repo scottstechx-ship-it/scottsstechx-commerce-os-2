@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -117,7 +118,7 @@ fun ProfileSettingsScreen(
             Spacer(Modifier.height(6.dp))
             Item(Icons.Filled.BugReport, "Report a Problem", "Tell us what's broken") { onOpenSection("report") }
             Spacer(Modifier.height(6.dp))
-            Item(Icons.Filled.Audit, "Account Activity", "Recent sign-ins & changes") { onOpenSection("audit") }
+            Item(Icons.Filled.List, "Account Activity", "Recent sign-ins & changes") { onOpenSection("audit") }
 
             Spacer(Modifier.height(16.dp))
             SectionHeader("Legal")
@@ -166,4 +167,3 @@ private fun Item(
     SettingsRow(icon = icon, title = title, subtitle = subtitle, titleColor = titleColor, onClick = onClick)
 }
 
-private val Color = androidx.compose.ui.graphics.Color

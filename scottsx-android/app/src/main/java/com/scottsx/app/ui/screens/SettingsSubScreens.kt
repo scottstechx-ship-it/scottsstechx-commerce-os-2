@@ -21,6 +21,8 @@ import com.scottsx.app.data.preferences.NotificationPrefs
 import com.scottsx.app.ui.components.SettingsScaffold
 import com.scottsx.app.ui.components.SettingsSectionHeader
 import com.scottsx.app.ui.theme.ScottsTechXColors
+import kotlinx.coroutines.launch
+import org.json.JSONArray
 
 @Composable
 fun NotificationSettingsScreen(onBack: () -> Unit) {
@@ -155,10 +157,9 @@ fun AuditScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         scope.launch {
-            V2Client.fetchMyAudit()?.let { arr ->
-                items.clear()
-                for (i in 0 until arr.length()) items.add(arr.getJSONObject(i))
-            }
+            val arr = V2Client.fetchMyAudit()
+            items.clear()
+            if (arr != null) for (i in 0 until arr.length()) items.add(arr.getJSONObject(i))
             loading = false
         }
     }

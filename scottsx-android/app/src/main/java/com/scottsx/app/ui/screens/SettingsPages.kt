@@ -244,9 +244,3 @@ fun SaveButton(saving: Boolean, onSave: () -> Unit) {
     }
 }
 
-// Aliased clickable for the SaveButton
-private fun Modifier.clickable(enabled: Boolean = true, onClick: () -> Unit): Modifier =
-    this.then(androidx.compose.foundation.clickable(enabled = enabled, onClick = onClick))
-
-private val androidx.compose.foundation.clickable: Modifier.(enabled: Boolean, onClick: () -> Unit) -> Modifier
-    get() = { e, oc -> this.then(androidx.compose.foundation.clickable(enabled = e, onClick = oc)) }

@@ -204,9 +204,9 @@ object V2Client {
     ) ?: false
 
     // Saved products
-    suspend fun fetchSavedProducts(): JSONObject? = apiCall(
+    suspend fun fetchSavedProducts(): JSONArray? = apiCallArray(
         method = "GET", path = "/api/v1/user/saved-products", body = null,
-        parse = { o -> o },
+        parse = { it },
     )
 
     suspend fun saveProduct(productId: String): Boolean = apiCall(
@@ -220,9 +220,9 @@ object V2Client {
     ) ?: false
 
     // Saved sellers
-    suspend fun fetchSavedSellers(): JSONObject? = apiCall(
+    suspend fun fetchSavedSellers(): JSONArray? = apiCallArray(
         method = "GET", path = "/api/v1/user/saved-sellers", body = null,
-        parse = { o -> o },
+        parse = { it },
     )
 
     suspend fun saveSeller(sellerId: String): Boolean = apiCall(
@@ -236,9 +236,9 @@ object V2Client {
     ) ?: false
 
     // Refunds
-    suspend fun fetchRefunds(): JSONObject? = apiCall(
+    suspend fun fetchRefunds(): JSONArray? = apiCallArray(
         method = "GET", path = "/api/v1/user/refunds", body = null,
-        parse = { o -> o },
+        parse = { it },
     )
 
     suspend fun createRefund(body: JSONObject): String? = apiCall(
@@ -247,9 +247,9 @@ object V2Client {
     )
 
     // Returns
-    suspend fun fetchReturns(): JSONObject? = apiCall(
+    suspend fun fetchReturns(): JSONArray? = apiCallArray(
         method = "GET", path = "/api/v1/user/returns", body = null,
-        parse = { o -> o },
+        parse = { it },
     )
 
     suspend fun createReturn(body: JSONObject): String? = apiCall(
@@ -258,9 +258,9 @@ object V2Client {
     )
 
     // Support tickets
-    suspend fun fetchTickets(): JSONObject? = apiCall(
+    suspend fun fetchTickets(): JSONArray? = apiCallArray(
         method = "GET", path = "/api/v1/support/tickets", body = null,
-        parse = { o -> o },
+        parse = { it },
     )
 
     suspend fun createTicket(category: String, subject: String, message: String, attachmentUrl: String? = null): String? = apiCall(
@@ -296,9 +296,9 @@ object V2Client {
     )
 
     // Notifications (user-specific)
-    suspend fun fetchNotifications(): JSONObject? = apiCall(
+    suspend fun fetchNotifications(): JSONArray? = apiCallArray(
         method = "GET", path = "/api/v1/user/notifications", body = null,
-        parse = { o -> o },
+        parse = { it },
     )
 
     suspend fun markAllNotificationsRead(): Boolean = apiCall(

@@ -35,10 +35,9 @@ fun RefundsScreen(onBack: () -> Unit) {
     fun reload() {
         scope.launch {
             loading = true
-            V2Client.fetchRefunds()?.let { arr ->
-                items.clear()
-                for (i in 0 until arr.length()) items.add(arr.getJSONObject(i))
-            }
+            val arr = V2Client.fetchRefunds()
+            items.clear()
+            if (arr != null) for (i in 0 until arr.length()) items.add(arr.getJSONObject(i))
             loading = false
         }
     }
@@ -177,10 +176,9 @@ fun ReturnsScreen(onBack: () -> Unit) {
     fun reload() {
         scope.launch {
             loading = true
-            V2Client.fetchReturns()?.let { arr ->
-                items.clear()
-                for (i in 0 until arr.length()) items.add(arr.getJSONObject(i))
-            }
+            val arr = V2Client.fetchReturns()
+            items.clear()
+            if (arr != null) for (i in 0 until arr.length()) items.add(arr.getJSONObject(i))
             loading = false
         }
     }

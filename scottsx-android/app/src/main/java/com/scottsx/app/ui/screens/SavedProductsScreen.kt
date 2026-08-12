@@ -23,6 +23,7 @@ import com.scottsx.app.ui.components.SettingsBlankHint
 import com.scottsx.app.ui.theme.ScottsTechXColors
 import kotlinx.coroutines.launch
 import org.json.JSONArray
+import org.json.JSONObject
 
 @Composable
 fun SavedProductsScreen(onBack: () -> Unit, onOpenProduct: (String) -> Unit = {}) {
@@ -31,10 +32,9 @@ fun SavedProductsScreen(onBack: () -> Unit, onOpenProduct: (String) -> Unit = {}
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         scope.launch {
-            V2Client.fetchSavedProducts()?.let { arr ->
-                list.clear()
-                for (i in 0 until arr.length()) list.add(arr.getJSONObject(i))
-            }
+            val arr = V2Client.fetchSavedProducts()
+            list.clear()
+            if (arr != null) for (i in 0 until arr.length()) list.add(arr.getJSONObject(i))
             loading = false
         }
     }
@@ -98,10 +98,9 @@ fun SavedSellersScreen(onBack: () -> Unit, onOpenStore: (String) -> Unit = {}) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         scope.launch {
-            V2Client.fetchSavedSellers()?.let { arr ->
-                list.clear()
-                for (i in 0 until arr.length()) list.add(arr.getJSONObject(i))
-            }
+            val arr = V2Client.fetchSavedSellers()
+            list.clear()
+            if (arr != null) for (i in 0 until arr.length()) list.add(arr.getJSONObject(i))
             loading = false
         }
     }
