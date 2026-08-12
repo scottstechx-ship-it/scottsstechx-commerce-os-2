@@ -35,9 +35,11 @@ fun SavedProductsScreen(onBack: () -> Unit, onOpenProduct: (String) -> Unit = {}
             val arr = V2Client.fetchSavedProducts()
             list.clear()
             if (arr != null) for (i in 0 until arr.length()) {
-                        val obj = arr.optJSONObject(i) ?: continue
-                        list.add(obj)
-                    }
+                            val obj = arr.optJSONObject(i)
+                            if (obj != null) {
+                                list.add(obj as JSONObject)
+                            }
+                        }
             loading = false
         }
     }
@@ -104,9 +106,11 @@ fun SavedSellersScreen(onBack: () -> Unit, onOpenStore: (String) -> Unit = {}) {
             val arr = V2Client.fetchSavedSellers()
             list.clear()
             if (arr != null) for (i in 0 until arr.length()) {
-                        val obj = arr.optJSONObject(i) ?: continue
-                        list.add(obj)
-                    }
+                            val obj = arr.optJSONObject(i)
+                            if (obj != null) {
+                                list.add(obj as JSONObject)
+                            }
+                        }
             loading = false
         }
     }

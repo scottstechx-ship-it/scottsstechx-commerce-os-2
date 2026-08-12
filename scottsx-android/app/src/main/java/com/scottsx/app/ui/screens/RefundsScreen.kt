@@ -38,9 +38,11 @@ fun RefundsScreen(onBack: () -> Unit) {
             val arr = V2Client.fetchRefunds()
             items.clear()
             if (arr != null) for (i in 0 until arr.length()) {
-                        val obj = arr.optJSONObject(i) ?: continue
-                        items.add(obj)
-                    }
+                            val obj = arr.optJSONObject(i)
+                            if (obj != null) {
+                                items.add(obj as JSONObject)
+                            }
+                        }
             loading = false
         }
     }
@@ -182,9 +184,11 @@ fun ReturnsScreen(onBack: () -> Unit) {
             val arr = V2Client.fetchReturns()
             items.clear()
             if (arr != null) for (i in 0 until arr.length()) {
-                        val obj = arr.optJSONObject(i) ?: continue
-                        items.add(obj)
-                    }
+                            val obj = arr.optJSONObject(i)
+                            if (obj != null) {
+                                items.add(obj as JSONObject)
+                            }
+                        }
             loading = false
         }
     }

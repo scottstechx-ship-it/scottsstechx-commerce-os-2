@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun MyOrdersScreen(onBack: () -> Unit, onTrack: (String) -> Unit, onOpenReturn: (String) -> Unit, onOpenRefund: (String) -> Unit) {
-    val agreements by TransactionStore.agreements.collectAsState()
+    val agreements = TransactionStore.agreements
     SettingsScaffold(title = "My Orders", onBack = onBack) {
         if (agreements.isEmpty()) {
             SettingsBlankHint("You haven't placed any orders yet.")
@@ -70,7 +70,7 @@ fun MyOrdersScreen(onBack: () -> Unit, onTrack: (String) -> Unit, onOpenReturn: 
 /** Track a single order — shows event timeline + ETA. */
 @Composable
 fun TrackOrderScreen(orderId: String, onBack: () -> Unit) {
-    val agreements by TransactionStore.agreements.collectAsState()
+    val agreements = TransactionStore.agreements
     val tx = agreements.firstOrNull { it.id == orderId }
     SettingsScaffold(title = "Track Order", onBack = onBack) {
         if (tx == null) {
