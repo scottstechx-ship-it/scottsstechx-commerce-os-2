@@ -180,7 +180,7 @@ fun AddProductScreen(
                                     "phone" in first || "iphone" in first || "samsung" in first ||
                                     "laptop" in first || "macbook" in first ||
                                     "headphone" in first || "watch" in first -> ProductCategory.Electronics
-                                    "shoe" in first || "sneaker" in first || "nike" in first -> ProductCategory.Footwear
+                                    "shoe" in first || "sneaker" in first || "nike" in first -> ProductCategory.Sports
                                     "dress" in first || "ankara" in first || "kitenge" in first -> ProductCategory.Fashion
                                     "lipstick" in first || "makeup" in first -> ProductCategory.Beauty
                                     "rice" in first -> ProductCategory.Groceries

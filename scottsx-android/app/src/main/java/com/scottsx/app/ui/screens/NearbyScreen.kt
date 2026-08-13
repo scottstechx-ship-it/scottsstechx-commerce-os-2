@@ -297,6 +297,19 @@ fun NearbyScreen(
                 androidx.compose.foundation.layout.Spacer(Modifier.height(4.dp))
             }
 
+            // Pre-compute filtered & sorted seller list (used by result count + list)
+            val filteredSellers = nearbySellers
+                .asSequence()
+                .filter { maxRadiusKm == 0 || it.distanceKm <= maxRadiusKm }
+                .sortedWith(
+                    when (sortBy) {
+                        "rating" -> compareByDescending<V2Client.NearbySeller> { it.rating }
+                        "products" -> compareByDescending<V2Client.NearbySeller> { it.products.size }
+                        else -> compareBy<V2Client.NearbySeller> { it.distanceKm }
+                    }
+                )
+                .toList()
+
             // Result count + status
             item {
                 Row(
@@ -348,18 +361,6 @@ fun NearbyScreen(
             }
 
             // Sellers
-            // Apply radius filter + sort to the local list
-            val filteredSellers = nearbySellers
-                .asSequence()
-                .filter { maxRadiusKm == 0 || it.distanceKm <= maxRadiusKm }
-                .sortedWith(
-                    when (sortBy) {
-                        "rating" -> compareByDescending<V2Client.NearbySeller> { it.rating }
-                        "products" -> compareByDescending<V2Client.NearbySeller> { it.products.size }
-                        else -> compareBy<V2Client.NearbySeller> { it.distanceKm }
-                    }
-                )
-                .toList()
             items(filteredSellers, key = { it.sellerId }) { seller ->
                 NearbySellerRow(
                     seller = seller,

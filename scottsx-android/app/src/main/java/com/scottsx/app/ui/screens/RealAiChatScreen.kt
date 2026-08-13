@@ -92,7 +92,7 @@ fun RealAiChatScreen(
             val products = runCatching { V2Client.fetchProductsList() }.getOrDefault(emptyList())
             val catalogCtx = if (products.isNotEmpty()) {
                 val brief = products.take(40).joinToString("\n") { p ->
-                    "- ${p.title} (${p.category}) UGX ${p.priceUgx} from ${p.seller.name} [id=${p.id}]"
+                    "- ${p.name} (${p.category}) UGX ${p.priceUgx} from ${p.seller.name} [id=${p.id}]"
                 }
                 "Live marketplace catalog (${products.size} products):\n$brief\n"
             } else {
