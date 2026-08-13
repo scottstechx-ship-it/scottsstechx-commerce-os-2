@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -76,6 +77,9 @@ fun AddProductScreen(
     var stockText by remember { mutableStateOf("10") }
     var imageUrls by remember { mutableStateOf(listOf<String>()) }
     var newImageUrl by remember { mutableStateOf("") }
+    var locationLabel by remember { mutableStateOf("Kampala") }
+    var publishStatus by remember { mutableStateOf<String?>(null) }
+    var publishResult by remember { mutableStateOf<com.scottsx.app.data.ProductUploadSafety.Result?>(null) }
     val scope = rememberCoroutineScope()
     var isUploading by remember { mutableStateOf(false) }
     val ctx = LocalContext.current
@@ -151,6 +155,29 @@ fun AddProductScreen(
                                 Text(
                                     text = c.displayName,
                                     color = if (c == category) Color.White else ScottsTechXColors.OnLight,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text("Location (where the item ships from)", color = ScottsTechXColors.OnLightSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(listOf("Kampala", "Entebbe", "Jinja", "Gulu", "Mbarara", "Arua")) { loc ->
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(
+                                        if (locationLabel == loc) ScottsTechXColors.BluePrimary else ScottsTechXColors.PanelInputLight,
+                                    )
+                                    .clickable { locationLabel = loc }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                            ) {
+                                Text(
+                                    text = loc,
+                                    color = if (locationLabel == loc) Color.White else ScottsTechXColors.OnLight,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                 )
@@ -233,6 +260,90 @@ fun AddProductScreen(
                             ReviewRow("Discount", "$discountText%")
                             ReviewRow("Stock", stockText)
                             ReviewRow("Images", "${imageUrls.size}")
+                            ReviewRow("Location", locationLabel)
+                        }
+                    }
+                }
+                3 -> {
+                    Text("Safety Check", color = ScottsTechXColors.OnLight, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Spacer(Modifier.height(8.dp))
+                    val safety = remember(name, description, category.displayName, priceText, stockText, imageUrls.size, locationLabel) {
+                        com.scottsx.app.data.ProductUploadSafety.check(
+                            com.scottsx.app.data.ProductUploadSafety.Draft(
+                                name = name,
+                                description = description,
+                                categoryName = category.displayName,
+                                priceUgx = priceText.toLongOrNull() ?: 0L,
+                                stock = stockText.toIntOrNull() ?: 0,
+                                imageCount = imageUrls.size,
+                                locationLabel = locationLabel,
+                            ),
+                        )
+                    }
+                    androidx.compose.runtime.LaunchedEffect(safety) {
+                        publishResult = safety
+                    }
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        colors = androidx.compose.material3.CardDefaults.cardColors(
+                            containerColor = when {
+                                safety.errors.isNotEmpty() -> Color(0xFFFFEBEE)
+                                safety.requiresAdminReview -> Color(0xFFFFF8E1)
+                                else -> Color(0xFFE8F5E9)
+                            },
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = when {
+                                    safety.errors.isNotEmpty() -> "X Fix ${safety.errors.size} issue(s) before publishing"
+                                    safety.requiresAdminReview -> "Pending admin review after publish"
+                                    else -> "Ready to publish"
+                                },
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = when {
+                                    safety.errors.isNotEmpty() -> Color(0xFFB71C1C)
+                                    safety.requiresAdminReview -> Color(0xFFE65100)
+                                    else -> Color(0xFF1B5E20)
+                                },
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "Draft -> Checking -> ${if (safety.requiresAdminReview) "Admin Review" else "Approved"} -> Live",
+                                fontSize = 11.sp,
+                                color = ScottsTechXColors.OnLightSecondary,
+                            )
+                        }
+                    }
+                    if (safety.issues.isNotEmpty()) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color.White),
+                            shape = RoundedCornerShape(12.dp),
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                safety.issues.forEach { issue ->
+                                    Row(modifier = Modifier.padding(vertical = 4.dp)) {
+                                        Text(
+                                            text = when (issue.severity) {
+                                                com.scottsx.app.data.ProductUploadSafety.Severity.BLOCK -> "X"
+                                                com.scottsx.app.data.ProductUploadSafety.Severity.WARN -> "!"
+                                                else -> "i"
+                                            },
+                                            color = when (issue.severity) {
+                                                com.scottsx.app.data.ProductUploadSafety.Severity.BLOCK -> Color(0xFFD32F2F)
+                                                com.scottsx.app.data.ProductUploadSafety.Severity.WARN -> Color(0xFFE65100)
+                                                else -> Color(0xFF1976D2)
+                                            },
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.width(28.dp),
+                                        )
+                                        Text(issue.message, fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -261,11 +372,30 @@ fun AddProductScreen(
                 Spacer(Modifier.width(8.dp))
             }
             PrimaryButton(
-                text = if (step == 2) "Save Product" else "Next",
+                text = if (step == 3) "Save Product" else "Next",
                 enabled = !isUploading,
                 loading = isUploading,
                 onClick = {
-                    if (step == 2) {
+                    if (step == 3) {
+                        // Run safety check before allowing publish
+                        val safety = com.scottsx.app.data.ProductUploadSafety.check(
+                            com.scottsx.app.data.ProductUploadSafety.Draft(
+                                name = name,
+                                description = description,
+                                categoryName = category.displayName,
+                                priceUgx = priceText.toLongOrNull() ?: 0L,
+                                stock = stockText.toIntOrNull() ?: 0,
+                                imageCount = imageUrls.size,
+                                locationLabel = locationLabel,
+                            ),
+                        )
+                        publishResult = safety
+                        if (!safety.isPublishable) {
+                            android.widget.Toast.makeText(
+                                ctx, "Fix ${safety.errors.size} blocking issue(s) before publishing", android.widget.Toast.LENGTH_LONG,
+                            ).show()
+                            return@PrimaryButton
+                        }
                         // Validation: name and price are required
                         if (name.isBlank() || priceText.isBlank()) {
                             android.widget.Toast.makeText(
