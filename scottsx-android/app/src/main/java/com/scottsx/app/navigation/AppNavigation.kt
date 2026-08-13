@@ -49,6 +49,7 @@ import com.scottsx.app.ui.screens.SellerAnalyticsScreen
 import com.scottsx.app.ui.screens.SellerHomeScreen
 import com.scottsx.app.ui.screens.SellerMessagesScreen
 import com.scottsx.app.ui.screens.ThemeScreen
+import com.scottsx.app.ui.screens.StoreSettingsDetailScreen
 import com.scottsx.app.ui.screens.SellerOrdersScreen
 import com.scottsx.app.ui.screens.SellerStorefrontScreen
 import com.scottsx.app.ui.screens.SignUpScreen
@@ -591,7 +592,19 @@ fun AppNavigation() {
             MarketplaceToolsScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.SELLER_STORE_SETTINGS) {
-            StoreSettingsScreen(onBack = { navController.popBackStack() })
+            StoreSettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenSection = { section ->
+                    navController.navigate("seller/store-settings/$section")
+                },
+            )
+        }
+        composable(
+            Routes.SELLER_STORE_SETTING_DETAIL,
+            arguments = listOf(navArgument("section") { type = NavType.StringType }),
+        ) { backStack ->
+            val section = backStack.arguments?.getString("section") ?: "store-profile"
+            StoreSettingsDetailScreen(section = section, onBack = { navController.popBackStack() })
         }
         composable(Routes.SELLER_PROFILE_SETTINGS) {
             ProfileSettingsScreen(
@@ -949,6 +962,7 @@ object Routes {
     const val SELLER_ANALYTICS = "seller/analytics"
     const val SELLER_TOOLS = "seller/marketplace-tools"
     const val SELLER_STORE_SETTINGS = "seller/store-settings"
+    const val SELLER_STORE_SETTING_DETAIL = "seller/store-settings/{section}"
     const val SELLER_PROFILE_SETTINGS = "seller/profile-settings"
     const val BUYER_PROFILE_SETTINGS = "buyer/profile-settings"
 
