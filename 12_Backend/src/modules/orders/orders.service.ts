@@ -1,10 +1,13 @@
 import { getPool } from "../../db.js";
-import type { OrderResponse } from "./checkout.schema.js";
+import type { CheckoutResponse } from "./checkout.schema.js";
+
+export type OrderResponse = CheckoutResponse;
 
 export async function listUserOrders(userId: string, status?: string): Promise<OrderResponse[]> {
   const params: any[] = [userId];
   let sql = `
-    SELECT o.id as order_id, o.status, o.total_minor, o.currency, o.fx_rate_snapshot
+    SELECT o.id as order_id, o.status, o.total_minor, o.currency, o.fx_rate_snapshot,
+           o.driver_lat, o.driver_lng
     FROM orders o
     WHERE o.customer_id = $1
   `;
@@ -35,7 +38,7 @@ export async function listUserOrders(userId: string, status?: string): Promise<O
 
 export async function getOrderById(orderId: string, userId: string): Promise<OrderResponse | null> {
   const res = await getPool().query(
-    "SELECT id as order_id, status, total_minor, currency, fx_rate_snapshot FROM orders WHERE id = $1 AND customer_id = $2",
+    "SELECT id as order_id, status, total_minor, currency, fx_rate_snapshot, driver_lat, driver_lng FROM orders WHERE id = $1 AND customer_id = $2",
     [orderId, userId]
   );
 

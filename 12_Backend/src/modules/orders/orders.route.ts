@@ -17,8 +17,8 @@ export async function registerOrdersRoute(app: FastifyInstance): Promise<void> {
     "/api/v1/orders",
     { preHandler: requireAuth },
     async (request, reply) => {
-      val user = getAuthUser(request);
-      val q = listOrdersQuerySchema.parse(request.query);
+      const user = getAuthUser(request);
+      const q = listOrdersQuerySchema.parse(request.query);
       const orders = await listUserOrders(user.id, q.status);
       reply.send(orders);
     },
@@ -28,8 +28,8 @@ export async function registerOrdersRoute(app: FastifyInstance): Promise<void> {
     "/api/v1/orders/:orderId",
     { preHandler: requireAuth },
     async (request, reply) => {
-      val user = getAuthUser(request);
-      val params = orderParamsSchema.parse(request.params);
+      const user = getAuthUser(request);
+      const params = orderParamsSchema.parse(request.params);
       const order = await getOrderById(params.orderId, user.id);
       if (!order) throw new NotFoundError("Order not found");
       reply.send(order);

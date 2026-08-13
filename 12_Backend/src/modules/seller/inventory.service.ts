@@ -1,5 +1,6 @@
 import { withTransaction } from "../../db.js";
-import { ForbiddenError, NotFoundError, BadRequestError } from "../../errors.js";
+import { matchNewProduct } from "../../services/saved-search-matcher.js";
+import { ForbiddenError, BadRequestError, NotFoundError } from "../../errors.js";
 import type { AuthUser } from "../../auth.js";
 import { insertAuditLog } from "../audit/audit.js";
 import type {
@@ -52,7 +53,7 @@ export async function listInventory(user: AuthUser): Promise<InventoryProduct[]>
     const res = await c.query(
       `SELECT id, seller_id, title, description, price_minor::text, currency,
               stock_quantity, COALESCE(product_trust_score, 50)::text AS product_trust_score,
-              NULL::text AS image_url, is_active
+              image_url, is_active
          FROM products
         WHERE seller_id = $1
         ORDER BY created_at DESC`,
@@ -85,12 +86,15 @@ export async function createProduct(
       is_active: boolean;
     }>(
       `INSERT INTO products
-         (seller_id, title, description, price_minor, currency, stock_quantity, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, true)
+         (seller_id, title, description, price_minor, currency, stock_quantity, is_active, image_url)
+       VALUES ($1, $2, $3, $4, $5, $6, true, $7)
        RETURNING id, seller_id, title, description, price_minor::text, currency,
                  stock_quantity, COALESCE(product_trust_score, 50)::text AS product_trust_score,
-                 NULL::text AS image_url, is_active`,
-      [user.id, body.title, body.description, body.priceMinor, body.currency, body.stockQuantity],
+                 image_url, is_active`,
+      [user.id, body.title, body.description, body.priceMinor, body.currency, body.stockQuantity,
+       // imageUrl takes precedence; fall back to the first entry of imageUrls;
+       // both may be absent (no image).
+       body.imageUrl ?? body.imageUrls?.[0] ?? null],
     );
     const row = res.rows[0]!;
     // imageUrl is per-product-media; we create a single media row when given.
@@ -113,6 +117,29 @@ export async function createProduct(
       `SELECT url FROM product_media WHERE product_id = $1 ORDER BY position LIMIT 1`,
       [row.id],
     );
+    // Fire the saved-search matcher. We use the seller's lat/lng as a
+    // proxy for the product's location — products don't have a separate
+    // location column today, and for a hyper-local MVP that's
+    // acceptable. The matcher is wrapped in a try/catch so a matcher
+    // bug can never block a product create. We swallow the error
+    // silently (audit log already captured the product.create event).
+    try {
+      const sellerLoc = await c.query<{ lat: number | null; lng: number | null }>(
+        `SELECT lat, lng FROM seller_profiles WHERE user_id = $1`,
+        [user.id],
+      );
+      const sl = sellerLoc.rows[0];
+      await matchNewProduct(c, {
+        productId: row.id,
+        productTitle: body.title,
+        productLat: sl?.lat ?? null,
+        productLng: sl?.lng ?? null,
+        productCategory: null, // no category column yet
+        productPriceMinor: body.priceMinor,
+      });
+    } catch {
+      // Best-effort: never let the matcher break product creation.
+    }
     return rowToProduct({
       ...row,
       image_url: media.rows[0]?.url ?? null,
@@ -169,40 +196,39 @@ export async function updateProduct(
     }
     sets.push(`updated_at = now()`);
 
+    // If imageUrl is being updated, write it to products.image_url so
+    // a single SELECT/RETURNING gives us everything we need.
+    const writesImage = body.imageUrl !== undefined;
+    if (writesImage && sets.length === 0) {
+      // Only image change — build a single-set update so the RETURNING
+      // runs in one round-trip.
+      sets.push(`image_url = $${vals.length + 1}`);
+      vals.push(body.imageUrl);
+    } else if (writesImage) {
+      sets.push(`image_url = $${vals.length + 1}`);
+      vals.push(body.imageUrl);
+    }
+
     let updatedRow: InventoryProduct | null = null;
     if (sets.length > 0) {
       const sql = `UPDATE products SET ${sets.join(", ")} WHERE id = $1
         RETURNING id, seller_id, title, description, price_minor::text, currency,
                   stock_quantity, COALESCE(product_trust_score, 50)::text AS product_trust_score,
-                  is_active`;
+                  image_url, is_active`;
       const res = await c.query(sql, [productId, ...vals]);
-      updatedRow = rowToProduct({ ...res.rows[0]!, image_url: null });
-    }
-
-    if (body.imageUrl !== undefined) {
-      await c.query(
-        `DELETE FROM product_media WHERE product_id = $1`,
-        [productId],
-      );
-      if (body.imageUrl) {
-        await c.query(
-          `INSERT INTO product_media (product_id, url, alt_text, position)
-           VALUES ($1, $2, '', 0)`,
-          [productId, body.imageUrl],
-        );
-      }
+      updatedRow = rowToProduct(res.rows[0]!);
     }
 
     if (!updatedRow) {
-      // Only image changed; re-read the row.
+      // Nothing changed; re-read.
       const r = await c.query(
         `SELECT id, seller_id, title, description, price_minor::text, currency,
                 stock_quantity, COALESCE(product_trust_score, 50)::text AS product_trust_score,
-                is_active
+                image_url, is_active
            FROM products WHERE id = $1`,
         [productId],
       );
-      updatedRow = rowToProduct({ ...r.rows[0]!, image_url: body.imageUrl ?? null });
+      updatedRow = rowToProduct(r.rows[0]!);
     }
 
     const media = await c.query<{ url: string }>(

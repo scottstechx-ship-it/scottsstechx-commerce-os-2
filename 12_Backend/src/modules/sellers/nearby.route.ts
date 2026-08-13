@@ -1,5 +1,4 @@
 import type { FastifyInstance } from "fastify";
-import { requireAuth } from "../../auth.js";
 import { getPool } from "../../db.js";
 import { nearbyQuerySchema } from "./nearby.schema.js";
 import {
@@ -13,7 +12,6 @@ import {
 export async function registerNearbyRoute(app: FastifyInstance): Promise<void> {
   app.get(
     "/api/v1/sellers/nearby",
-    { preHandler: requireAuth },
     async (request, reply) => {
       const q = nearbyQuerySchema.parse(request.query);
       const rows = await findNearbySellers(getPool(), q);

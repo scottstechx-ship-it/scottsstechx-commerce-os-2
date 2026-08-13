@@ -5,17 +5,21 @@ import { ForbiddenError } from "../../errors.js";
 import { z } from "zod";
 
 const sellerOrdersQuerySchema = z.object({
+  // Accept "?status=null" / "?status=" from client libs that stringify
+  // nullables. Coerce to undefined so the optional enum doesn't reject.
   status: z
-    .enum([
-      "created",
-      "paid",
-      "assigned",
-      "picked_up",
-      "delivered",
-      "cancelled",
-      "refunded",
-    ])
-    .optional(),
+    .preprocess(
+      (v) => (v === "null" || v === "" ? undefined : v),
+      z.enum([
+        "created",
+        "paid",
+        "assigned",
+        "picked_up",
+        "delivered",
+        "cancelled",
+        "refunded",
+      ]).optional(),
+    ),
 });
 
 export type SellerStats = {
@@ -130,6 +134,19 @@ export async function listSellerOrders(
 export async function registerDashboardRoute(app: FastifyInstance): Promise<void> {
   app.get(
     "/api/v1/seller/stats",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const user = getAuthUser(request);
+      reply.send(await getSellerStats(user));
+    },
+  );
+
+  // The Android client's older API contract hits /api/v1/seller/dashboard
+  // (singular "dashboard") for the seller landing page. The new contract
+  // uses /api/v1/seller/stats. Both are the same data — keep this alias
+  // so existing APK builds don't 404 after the rename.
+  app.get(
+    "/api/v1/seller/dashboard",
     { preHandler: requireAuth },
     async (request, reply) => {
       const user = getAuthUser(request);

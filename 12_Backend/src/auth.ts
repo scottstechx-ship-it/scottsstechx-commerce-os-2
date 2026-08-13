@@ -18,7 +18,7 @@ const ALG = "HS256";
 const ISS = "scottstechx";
 const AUD = "scottstechx-api";
 
-export type UserRole = "buyer" | "driver" | "seller" | "admin";
+export type UserRole = "buyer" | "seller" | "admin";
 
 export type AuthUser = {
   id: string;
@@ -44,7 +44,7 @@ export async function signToken(
   user: AuthUser,
   opts: { ttlSeconds?: number } = {},
 ): Promise<string> {
-  const ttl = opts.ttlSeconds ?? 3600;
+  const ttl = opts.ttlSeconds ?? 86400; // 24 hours
   return new SignJWT({ role: user.role, email: user.email })
     .setProtectedHeader({ alg: ALG })
     .setSubject(user.id)
@@ -82,7 +82,7 @@ export async function verifyToken(token: string): Promise<AuthUser> {
 }
 
 function isUserRole(s: string): s is UserRole {
-  return s === "buyer" || s === "driver" || s === "seller" || s === "admin";
+  return s === "buyer" || s === "seller" || s === "admin";
 }
 
 /**

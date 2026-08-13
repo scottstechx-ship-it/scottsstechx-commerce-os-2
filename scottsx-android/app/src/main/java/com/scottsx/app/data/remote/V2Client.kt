@@ -19,7 +19,9 @@ object V2Client {
     private const val TAG = "V2Client"
 
     // Default backend base URL — override at runtime via setBaseUrl().
-    private const val DEFAULT_BASE_URL = "http://10.0.2.2:3001"
+    // Real device + adb reverse tcp:3001 tcp:3001 → reaches the host backend.
+    // For Android emulator without adb reverse, use 10.0.2.2 instead.
+    private const val DEFAULT_BASE_URL = "http://127.0.0.1:3001"
     @Volatile private var baseUrlOverride: String? = null
     fun setBaseUrl(url: String) { baseUrlOverride = url }
 
@@ -518,17 +520,11 @@ object V2Client {
             method = "PUT",
             path = "/api/v1/settings/v2",
             body = patch,
-            parse = { o -> o.optBoolean("ok", false) }
-    // Stage 5.5: user + store profile updates. These are thin wrappers
-    // around the V2 endpoints (mirrored to Firestore by the backend).
-    suspend fun updateUserProfile(patch: JSONObject): Boolean =
-        apiCall(
-            method = "PATCH",
-            path = "/api/v1/user/profile",
-            body = patch,
             parse = { o -> o.optBoolean("ok", false) },
         ) ?: false
 
+    // Stage 5.5: user + store profile updates. These are thin wrappers
+    // around the V2 endpoints (mirrored to Firestore by the backend).
     suspend fun updateStoreProfile(patch: JSONObject): Boolean =
         apiCall(
             method = "PATCH",
@@ -564,8 +560,6 @@ object V2Client {
             path = "/api/v1/user/profile",
             body = JSONObject().put("avatarUrl", avatarUrl),
             parse = { o -> o.optBoolean("ok", false) },
-        ) ?: false
-,
         ) ?: false
 
     // ----------------------------------------------------------------

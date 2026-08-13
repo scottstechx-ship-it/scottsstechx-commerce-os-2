@@ -28,7 +28,7 @@ export function getPool(connectionString?: string): pg.Pool {
   }
   _pool = new Pool({
     connectionString: cs,
-    ssl: { rejectUnauthorized: false },
+    ssl: process.env.PGSSL === "require" ? { rejectUnauthorized: false } : false,
     max: 10,
   });
   return _pool;
@@ -44,7 +44,7 @@ export async function closePool(): Promise<void> {
 export type TxnContext = {
   /** Verified user UUID from the JWT. Null only for service-level operations. */
   userId: string | null;
-  /** Optional role claim (buyer/driver/seller/admin) for service-layer guards. */
+  /** Optional role claim (buyer/seller/admin) for service-layer guards. */
   role?: string | null;
 };
 

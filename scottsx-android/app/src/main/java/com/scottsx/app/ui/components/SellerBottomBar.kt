@@ -57,7 +57,7 @@ fun SellerBottomBar(
     selected: SellerBottomTab,
     onSelect: (SellerBottomTab) -> Unit,
     onAddClicked: () -> Unit,
-    onAiClicked: () -> Unit = onAddClicked,
+    onAiClicked: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -103,9 +103,9 @@ fun SellerBottomBar(
             }
         }
 
-        // Center FAB — sits above the bar, larger pill. Icon comes from the onAiClick parameter.
+        // Center Add FAB — sits above the bar, larger pill.
         val pressed by animateFloatAsState(
-            targetValue = if (selected == SellerBottomTab.AI) 1.04f else 1f,
+            targetValue = if (selected == SellerBottomTab.Add) 1.04f else 1f,
             animationSpec = tween(160),
             label = "add-fab-scale",
         )
@@ -125,12 +125,12 @@ fun SellerBottomBar(
                         ),
                     ),
                 )
-                .clickable(onClick = onAiClicked),
+                .clickable(onClick = onAddClicked),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = Icons.Filled.AutoAwesome,
-                contentDescription = "AI Assistant",
+                imageVector = Icons.Filled.Add,
+                contentDescription = "Add Product",
                 tint = Color.White,
                 modifier = Modifier.size(28.dp),
             )
@@ -183,8 +183,8 @@ private fun SellerNavItem(
 /** The five seller tabs. The Add tab is reserved for the FAB. */
 enum class SellerBottomTab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Filled.Home),
-    AI("AI Assistant", Icons.Filled.AutoAwesome),
     Add("Add", Icons.Filled.AddCircle),
+    AI("AI Assistant", Icons.Filled.AutoAwesome),
     Messages("Messages", Icons.Filled.ChatBubble),
     Analytics("Analytics", Icons.Filled.Analytics),
 }

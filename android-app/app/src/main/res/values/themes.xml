@@ -1,11 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-      Base theme is the empty Material 3 day/night parent. Compose owns the
-      real colors; this XML theme is just the splash + status-bar layer.
+      Base theme. Compose owns the real colors; this XML theme is the
+      splash + status-bar layer that the system shows BEFORE the
+      Compose UI has rendered.
+
+      - windowBackground: splash_logo (ScottsTechX mark on brand green).
+        This is what the user sees on cold start. If the activity
+        crashes during setContent, the user still sees the logo
+        instead of a black screen, so we know the Activity started.
+
+      - android:statusBarColor / navigationBarColor: brand green so the
+        system bars match the splash.
+
+      - windowSplashScreenBackground: brand green, for Android 12+
+        SplashScreen API (used by values-v31/themes.xml).
     -->
     <style name="Theme.ScottsTechX" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:statusBarColor">#FF1B5E20</item>
-        <item name="android:windowBackground">#FFFFFFFF</item>
+        <item name="android:windowBackground">@drawable/splash_logo</item>
+        <item name="android:statusBarColor">#1B5E20</item>
+        <item name="android:navigationBarColor">#1B5E20</item>
     </style>
 </resources>

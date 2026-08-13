@@ -28,7 +28,9 @@
  * "Mobile money not yet integrated (stub)" in the UI.
  */
 
-import { NotImplementedError } from "../../errors.js";
+import { withTransaction } from "../../db.js";
+import { assertTransition } from "../orders/order.state.js";
+import { insertAuditLog } from "../audit/audit.js";
 
 export type MomoCollectionRequest = {
   orderId: string;
@@ -43,10 +45,82 @@ export type MomoCollectionResult = {
   status: "PENDING" | "SUCCESSFUL" | "FAILED";
 };
 
+/**
+ * High-fidelity MoMo simulation for Uganda MVP.
+ * - 25677... -> Success after 5s (MTN simulation)
+ * - 25670... -> Success after 5s (Airtel simulation)
+ * - 25678... -> Failure after 5s (Simulate Insufficient Funds)
+ */
 export async function requestMomoCollection(
-  _req: MomoCollectionRequest,
+  req: MomoCollectionRequest,
 ): Promise<MomoCollectionResult> {
-  throw new NotImplementedError(
-    "Mobile money collection not implemented. See MomoClient.requestMomoCollection for the real HTTP shape.",
-  );
+  const referenceId = Math.random().toString(36).substring(7).toUpperCase();
+
+  // Simulate async MoMo Push/Approval flow
+  setTimeout(async () => {
+    try {
+      const isFailure = req.payerPhone.startsWith("25678");
+      await handleMomoCompletion(req.orderId, referenceId, isFailure ? "FAILED" : "SUCCESSFUL");
+    } catch (err) {
+      console.error("[momo-sim] background update failed:", err);
+    }
+  }, 5000);
+
+  return {
+    referenceId,
+    status: "PENDING",
+  };
+}
+
+async function handleMomoCompletion(orderId: string, referenceId: string, status: "SUCCESSFUL" | "FAILED") {
+  console.log(`[momo-sim] order=${orderId} reference=${referenceId} outcome=${status}`);
+
+  await withTransaction({ userId: null, role: "system" }, async (client) => {
+    const res = await client.query<{ status: any }>(
+      "SELECT status FROM orders WHERE id = $1",
+      [orderId]
+    );
+
+    if (!res.rowCount) return;
+    const currentStatus = res.rows[0]!.status;
+
+    if (status === "SUCCESSFUL") {
+      if (currentStatus === "paid") return;
+      assertTransition(currentStatus, "paid");
+
+      await client.query(
+        `UPDATE orders
+         SET status = 'paid',
+             paid_at = now(),
+             payment_status = 'succeeded',
+             payment_metadata = payment_metadata || $2::jsonb
+         WHERE id = $1`,
+        [orderId, JSON.stringify({ momo_ref: referenceId, provider: "momo" })]
+      );
+
+      await insertAuditLog(client, {
+        actor_user_id: null,
+        action: "payment_captured",
+        resource_type: "order",
+        resource_id: orderId,
+        payload: { provider: "momo", reference: referenceId },
+      });
+    } else {
+      await client.query(
+        `UPDATE orders
+         SET payment_status = 'failed',
+             payment_metadata = payment_metadata || $2::jsonb
+         WHERE id = $1`,
+        [orderId, JSON.stringify({ momo_ref: referenceId, error: "customer_rejected" })]
+      );
+
+      await insertAuditLog(client, {
+        actor_user_id: null,
+        action: "payment_failed",
+        resource_type: "order",
+        resource_id: orderId,
+        payload: { provider: "momo", reference: referenceId, reason: "customer_rejected" },
+      });
+    }
+  });
 }

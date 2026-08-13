@@ -21,7 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.ImageLoader
+import coil.Coil
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.scottsx.app.ui.theme.ScottsTechXColors
@@ -45,7 +45,11 @@ fun ProductImage(
         palettes[imageKey.hashCode().let { (it and 0x7FFFFFFF) % palettes.size }]
     }
     val ctx = LocalContext.current
-    val loader = remember { ImageLoader.Builder(ctx).build() }
+    // Use the global Coil ImageLoader (configured in ScottsTechXApp
+    // with 50MB disk cache + 25% RAM memory cache + 8s/15s timeouts).
+    // Local Coil.imageLoader(ctx) instead of building a new one so
+    // product photos share the same cache and OkHttp pool.
+    val loader = remember { Coil.imageLoader(ctx) }
 
     Box(
         modifier = modifier

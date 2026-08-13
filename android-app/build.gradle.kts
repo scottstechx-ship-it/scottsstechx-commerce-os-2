@@ -1,4 +1,4 @@
-// ScottsTechX Commerce OS — Android client (buyer + driver MVP)
+﻿// ScottsTechX Commerce OS — Android client (buyer + seller MVP)
 // Top-level build file. Plugins are declared here without applying them so
 // module-level build.gradle.kts files can opt in.
 

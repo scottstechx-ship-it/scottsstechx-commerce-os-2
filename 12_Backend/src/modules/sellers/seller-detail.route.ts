@@ -1,5 +1,4 @@
 import type { FastifyInstance } from "fastify";
-import { requireAuth } from "../../auth.js";
 import { getPool } from "../../db.js";
 import { NotFoundError } from "../../errors.js";
 import { sellerIdParamSchema } from "./seller-detail.schema.js";
@@ -10,7 +9,6 @@ export async function registerSellerDetailRoute(
 ): Promise<void> {
   app.get(
     "/api/v1/sellers/:sellerId",
-    { preHandler: requireAuth },
     async (request, reply) => {
       const { sellerId } = sellerIdParamSchema.parse(request.params);
       const detail = await findSellerDetail(getPool(), sellerId);

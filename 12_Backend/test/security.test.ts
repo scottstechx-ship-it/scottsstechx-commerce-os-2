@@ -22,7 +22,7 @@ import { query, withTransaction } from "../src/db.js";
 let baseUrl = "";
 let buyerToken = "";
 let driverToken = "";
-let otherBuyerId = "88888888-8888-4888-8888-888888888888";
+const otherBuyerId = "88888888-8888-4888-8888-888888888888";
 
 beforeAll(async () => {
   await setupOnce();
@@ -204,6 +204,7 @@ describe("G3 Security: RLS — cross-tenant denial", () => {
     expect(co.status).toBe(201);
 
     const otherToken = await mintToken("buyer", otherBuyerId);
+    void otherToken; // mint kept for symmetry / future "other buyer attempts to fetch" assertions
     // Other buyer cannot even probe the order via a SELECT — RLS denies.
     // We SET LOCAL ROLE rls_tester (no BYPASSRLS) to enforce RLS for the
     // probe connection; the postgres superuser would bypass it.

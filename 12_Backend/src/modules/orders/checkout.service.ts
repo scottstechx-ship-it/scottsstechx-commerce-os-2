@@ -21,6 +21,7 @@ import type { AuthUser } from "../../auth.js";
 import { hashRequest, checkIdempotency, storeIdempotency } from "./idempotency.js";
 import { getRateUGXto, isSupportedCurrency, type Currency } from "../fx/fx.js";
 import { insertAuditLog } from "../audit/audit.js";
+import { requestMomoCollection } from "../payments/momo.js";
 import type { CheckoutBody, CheckoutResponse } from "./checkout.schema.js";
 
 export async function checkout(
@@ -139,8 +140,8 @@ async function createOrderTx(
 
   // 5. Insert order + items + decrement stock + audit. All in one tx.
   const orderResult = await client.query<{ id: string; created_at: string }>(
-    `INSERT INTO orders (customer_id, seller_id, total_minor, currency, fx_rate_snapshot, status, delivery_address)
-     VALUES ($1, $2, $3, $4, $5, 'created', $6)
+    `INSERT INTO orders (customer_id, seller_id, total_minor, currency, fx_rate_snapshot, status, delivery_address, payment_provider)
+     VALUES ($1, $2, $3, $4, $5, 'created', $6, $7)
      RETURNING id, created_at`,
     [
       user.id,
@@ -149,9 +150,24 @@ async function createOrderTx(
       orderCurrency,
       rate,
       JSON.stringify(body.delivery_address),
+      body.payment_method === "momo" ? "momo" : "stripe",
     ],
   );
   const orderId = orderResult.rows[0]!.id;
+
+  // 6. Trigger Payment if MoMo
+  if (body.payment_method === "momo") {
+    if (!body.payment_phone) {
+      throw new BadRequestError("payment_phone is required for MoMo checkout");
+    }
+    await requestMomoCollection({
+      orderId,
+      amountMinor: Number(totalMinor),
+      currency: "UGX",
+      payerPhone: body.payment_phone,
+      externalId: orderId,
+    });
+  }
 
   for (const line of body.items) {
     await client.query(

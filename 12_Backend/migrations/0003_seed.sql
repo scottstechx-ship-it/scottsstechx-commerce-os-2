@@ -1,6 +1,10 @@
 -- 0003_seed.sql — minimal seed data for local dev and tests.
 -- The password_hash for all three demo users is bcrypt of "demo1234".
 -- Generated once and pinned here so the same credentials work in any environment.
+--
+-- The original seed used email as the unique key. 0007_phone_login.sql added
+-- the `phone` column and 0008_seed_geo_update.sql populates phones + lat/lng
+-- on existing DBs (and on fresh installs, the upsert in 0008 handles it).
 
 INSERT INTO users (id, email, display_name, role, password_hash) VALUES
   ('11111111-1111-4111-8111-111111111111', 'buyer-demo@scottstechx.test',  'Demo Buyer',  'buyer',  '$2a$10$abcdefghijklmnopqrstuv'),

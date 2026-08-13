@@ -21,6 +21,8 @@ export const checkoutBodySchema = z.object({
     city: z.string().min(1).max(100),
     country: z.literal("UG"),
   }),
+  payment_method: z.enum(["momo", "card"]).default("momo"),
+  payment_phone: z.string().optional(),
 });
 
 export type CheckoutBody = z.infer<typeof checkoutBodySchema>;
@@ -39,6 +41,8 @@ export const checkoutResponseSchema = z.object({
   total_minor: z.number().int().nonnegative(),
   currency: z.string().length(3),
   fx_rate_snapshot: z.string(),
+  driver_lat: z.number().nullable().optional(),
+  driver_lng: z.number().nullable().optional(),
   items: z.array(
     z.object({
       product_id: z.string().uuid(),

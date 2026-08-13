@@ -41,7 +41,7 @@ export class GoogleAuthDisabledError extends Error {
 
 export const googleAuthBodySchema = z.object({
   idToken: z.string().min(10),
-  role: z.enum(["buyer", "driver", "seller"]).optional(),
+  role: z.enum(["buyer", "seller"]).optional(),
 });
 
 export type GoogleAuthBody = z.infer<typeof googleAuthBodySchema>;
@@ -57,6 +57,38 @@ export type GoogleAuthResult = {
 
 export async function googleAuth(body: GoogleAuthBody): Promise<GoogleAuthResult> {
   const clientId = process.env.GOOGLE_CLIENT_ID;
+
+  // ---- DEV-MODE MOCK GOOGLE AUTH ----
+  if (body.idToken === "dev-mock-token") {
+    console.log("[auth-sim] using mock google token for role:", body.role);
+    const mockEmail = "dev-user@example.com";
+    const displayName = "Test Developer";
+    const requestedRole: UserRole = body.role ?? "buyer";
+
+    const user = await withTransaction({ userId: null, role: null }, async (c) => {
+      const existing = await c.query<{ id: string; role: UserRole }>(
+        "SELECT id, role FROM users WHERE email = $1", [mockEmail]
+      );
+      if (existing.rowCount && existing.rowCount > 0) return existing.rows[0]!;
+
+      const inserted = await c.query<{ id: string; role: UserRole }>(
+        "INSERT INTO users (email, display_name, role) VALUES ($1, $2, $3) RETURNING id, role",
+        [mockEmail, displayName, requestedRole]
+      );
+      return inserted.rows[0]!;
+    });
+
+    const token = await signToken({ id: user.id, role: user.role, email: mockEmail });
+    return {
+      token,
+      userId: user.id,
+      role: user.role,
+      email: mockEmail,
+      expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+      trustTier: "GOLD",
+    };
+  }
+
   if (!clientId) throw new GoogleAuthDisabledError();
 
   const verifyOpts: Parameters<typeof jwtVerify>[2] = {
@@ -111,12 +143,6 @@ export async function googleAuth(body: GoogleAuthBody): Promise<GoogleAuthResult
            VALUES ($1, $2)
            ON CONFLICT (user_id) DO NOTHING`,
           [inserted.rows[0]!.id, `${displayName}'s Shop`],
-        );
-      }
-      if (requestedRole === "driver") {
-        await c.query(
-          `INSERT INTO driver_profiles (user_id) VALUES ($1) ON CONFLICT DO NOTHING`,
-          [inserted.rows[0]!.id],
         );
       }
       return inserted.rows[0]!;
@@ -179,6 +205,21 @@ export async function registerGoogleAuthRoute(app: FastifyInstance): Promise<voi
     } catch (err) {
       if (err instanceof GoogleAuthDisabledError) {
         reply.status(503).send({ error: err.code, message: err.message });
+        return;
+      }
+      // Map the jose / JWKS errors to a clean 401 instead of leaking a
+      // 500 with internal exception details. The Android client treats
+      // 401 as "token rejected, please re-authenticate" which is the
+      // correct UX for "your Google ID token is invalid or expired".
+      const msg = err instanceof Error ? err.message : String(err);
+      const looksLikeJwks =
+        /JWS|JWT|signature|verify|JWKS|expired|invalid|claim/i.test(msg);
+      if (looksLikeJwks) {
+        request.log.warn({ err: msg }, "google_auth_invalid_token");
+        reply.status(401).send({
+          error: "google_auth_invalid",
+          message: "Google ID token is invalid or expired",
+        });
         return;
       }
       throw err;

@@ -44,7 +44,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scottsx.app.data.remote.V2Client
-import com.scottsx.app.data.remote.V2Client
 import com.scottsx.app.ui.theme.ScottsTechXColors
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -274,7 +273,7 @@ fun StoreSettingsDetailScreen(
             }
 
             Spacer(Modifier.height(20.dp))
-            SaveButton(saving = saving, onSave = ::doSave)
+            SettingsSaveButton(saving = saving, onSave = ::doSave)
 
             errorMessage?.let {
                 Spacer(Modifier.height(8.dp))
@@ -374,7 +373,7 @@ private fun ToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean
 }
 
 @Composable
-private fun SaveButton(saving: Boolean, onSave: () -> Unit) {
+private fun SettingsSaveButton(saving: Boolean, onSave: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
