@@ -84,6 +84,7 @@ fun ProductCard(
         ) {
             ProductImage(
                 imageKey = product.imageUrl,
+                imageUrl = product.imageUrl,
                 categoryLabel = product.category.displayName,
                 modifier = Modifier.fillMaxSize(),
             )

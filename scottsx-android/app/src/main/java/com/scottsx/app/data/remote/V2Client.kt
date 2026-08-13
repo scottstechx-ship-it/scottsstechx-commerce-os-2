@@ -518,7 +518,54 @@ object V2Client {
             method = "PUT",
             path = "/api/v1/settings/v2",
             body = patch,
+            parse = { o -> o.optBoolean("ok", false) }
+    // Stage 5.5: user + store profile updates. These are thin wrappers
+    // around the V2 endpoints (mirrored to Firestore by the backend).
+    suspend fun updateUserProfile(patch: JSONObject): Boolean =
+        apiCall(
+            method = "PATCH",
+            path = "/api/v1/user/profile",
+            body = patch,
             parse = { o -> o.optBoolean("ok", false) },
+        ) ?: false
+
+    suspend fun updateStoreProfile(patch: JSONObject): Boolean =
+        apiCall(
+            method = "PATCH",
+            path = "/api/v1/seller/store-settings",
+            body = patch,
+            parse = { o -> o.optBoolean("ok", false) },
+        ) ?: false
+
+    /**
+     * Upload a product image by URL. The backend stores the URL in
+     * [product_media] and the new product's [image_url] is updated.
+     * Returns the persisted URL on success, or null on failure.
+     */
+    suspend fun uploadProductImageUrl(productId: String, url: String, position: Int = 0): String? =
+        apiCall(
+            method = "POST",
+            path = "/api/v1/products/v2/$productId/media",
+            body = JSONObject().apply {
+                put("url", url)
+                put("position", position)
+                put("mediaType", "image")
+            },
+            parse = { o -> o.optString("url").ifBlank { url } },
+        )
+
+    /**
+     * Upload avatar URL for the current user. The backend stores it on
+     * the users.avatar_url column (and mirrors to Firestore).
+     */
+    suspend fun uploadAvatarUrl(avatarUrl: String): Boolean =
+        apiCall(
+            method = "PATCH",
+            path = "/api/v1/user/profile",
+            body = JSONObject().put("avatarUrl", avatarUrl),
+            parse = { o -> o.optBoolean("ok", false) },
+        ) ?: false
+,
         ) ?: false
 
     // ----------------------------------------------------------------

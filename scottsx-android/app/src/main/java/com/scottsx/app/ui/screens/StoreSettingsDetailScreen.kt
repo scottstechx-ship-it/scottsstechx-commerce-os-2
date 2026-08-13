@@ -28,7 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.scottsx.app.data.remote.V2Client
 import com.scottsx.app.data.remote.V2Client
 import com.scottsx.app.ui.theme.ScottsTechXColors
 import kotlinx.coroutines.launch
@@ -335,20 +335,24 @@ private fun Field(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label) },
+        label = { Text(label, color = ScottsTechXColors.OnLight) },
         placeholder = if (hint != null) { { Text(hint, color = ScottsTechXColors.OnLightSecondary) } } else null,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
+        textStyle = androidx.compose.ui.text.TextStyle(
+            color = ScottsTechXColors.OnLight,
+            fontSize = 15.sp,
+        ),
+        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
             focusedTextColor = ScottsTechXColors.OnLight,
             unfocusedTextColor = ScottsTechXColors.OnLight,
-            focusedLabelColor = ScottsTechXColors.OnLightSecondary,
-            unfocusedLabelColor = ScottsTechXColors.OnLightSecondary,
             focusedBorderColor = ScottsTechXColors.BluePrimary,
             unfocusedBorderColor = ScottsTechXColors.OnLightSecondary.copy(alpha = 0.3f),
             cursorColor = ScottsTechXColors.BluePrimary,
+            focusedContainerColor = Color.White,
+            unfocusedContainerColor = Color.White,
+            focusedLabelColor = ScottsTechXColors.BluePrimary,
+            unfocusedLabelColor = ScottsTechXColors.OnLightSecondary,
         ),
     )
 }

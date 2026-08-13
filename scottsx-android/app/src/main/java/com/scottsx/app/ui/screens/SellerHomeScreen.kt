@@ -257,6 +257,7 @@ fun SellerHomeScreen(
                     }
                 },
                 onAddClicked = onAddProduct,
+                onAiClicked = onOpenSellerAi,
             )
         }
 
