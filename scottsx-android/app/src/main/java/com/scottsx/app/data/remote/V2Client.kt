@@ -194,6 +194,50 @@ object V2Client {
         parse = { o -> o.optBoolean("ok", false) },
     ) ?: false
 
+    // ============================================================
+    // SELLER PROFILE & STORE SETTINGS
+    // ============================================================
+
+    /**
+     * GET /api/v1/seller/profile — returns the current seller's full
+     * seller profile (business name, address, etc.). Returns null on
+     * 404 (seller not yet on-boarded) or any non-2xx.
+     */
+    suspend fun fetchSellerProfile(): org.json.JSONObject? = apiCall(
+        method = "GET", path = "/api/v1/seller/profile", body = null,
+        parse = { it },
+    )
+
+    /**
+     * PATCH /api/v1/seller/profile — incremental update of the
+     * seller's business profile. The [patch] object's keys are mapped
+     * 1:1 to the backend schema.
+     */
+    suspend fun updateSellerProfile(patch: JSONObject): Boolean = apiCall(
+        method = "PATCH", path = "/api/v1/seller/profile", body = patch,
+        parse = { o -> o.optBoolean("ok", true) },
+    ) ?: false
+
+    /**
+     * GET /api/v1/seller/store-settings — current store branding
+     * (storeName, logoUrl, bannerUrl, opening hours, social links).
+     * Returns null if the seller has no settings yet.
+     */
+    suspend fun fetchStoreSettings(): org.json.JSONObject? = apiCall(
+        method = "GET", path = "/api/v1/seller/store-settings", body = null,
+        parse = { it },
+    )
+
+    /**
+     * PATCH /api/v1/seller/store-settings — store branding update.
+     * Supports logoUrl, bannerUrl, storeName, storeDescription, social
+     * links, opening hours JSON, etc.
+     */
+    suspend fun updateStoreSettings(patch: JSONObject): Boolean = apiCall(
+        method = "PATCH", path = "/api/v1/seller/store-settings", body = patch,
+        parse = { o -> o.optBoolean("ok", true) },
+    ) ?: false
+
     // Addresses
     data class Address(
         val id: String, val label: String, val recipient: String, val phone: String?,

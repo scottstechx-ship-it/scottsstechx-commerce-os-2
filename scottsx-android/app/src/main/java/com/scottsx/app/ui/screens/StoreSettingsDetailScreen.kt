@@ -30,36 +30,33 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.scottsx.app.data.remote.V2Client
 import com.scottsx.app.ui.theme.ScottsTechXColors
+import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 /**
  * Single store-settings detail screen. Renders a form specific to the
- * [section] passed in. Sections handled:
- *
- *   - "store-profile"   : Store name + description + logo placeholder
- *   - "business-info"   : Verified business name + tax ID + ID upload
- *   - "store-location"  : Address + pickup point + radius
- *   - "delivery"        : Delivery radius + fee + free-above threshold
- *   - "payments"        : Mobile money + bank account placeholders
- *   - "notifications"   : Order / buyer / marketing toggles
- *   - "security"        : Password + 2FA placeholders
- *   - "policies"        : Returns / refunds / terms editors
- *   - "help"            : FAQ + contact info
- *
- * State is local (remember) and saved to a Toast on Save so the UI
- * confirms the action. The backend store-settings endpoints will be
- * wired in a follow-up.
+ * [section] passed in. Each form:
+ *   1. Pre-fills from the backend on first compose
+ *   2. Lets the seller edit values
+ *   3. PATCHes to /api/v1/seller/store-settings (or /seller/profile for
+ *      business info) on Save
+ *   4. Shows a green "Saved!" flash card on success
  */
 @Composable
 fun StoreSettingsDetailScreen(
@@ -67,7 +64,93 @@ fun StoreSettingsDetailScreen(
     onBack: () -> Unit,
 ) {
     val (title, _) = sectionMeta(section)
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var saveFlash by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var saving by remember { mutableStateOf(false) }
+    var loaded by remember { mutableStateOf(false) }
+
+    // Form state — initialised from the backend
+    var name by remember { mutableStateOf("") }
+    var desc by remember { mutableStateOf("") }
+    var logoUrl by remember { mutableStateOf("") }
+    var legalName by remember { mutableStateOf("") }
+    var taxId by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+    var pickup by remember { mutableStateOf("") }
+    var radiusText by remember { mutableStateOf("10") }
+    var feeText by remember { mutableStateOf("5000") }
+    var freeAbove by remember { mutableStateOf("100000") }
+    var codEnabled by remember { mutableStateOf(true) }
+    var momoProvider by remember { mutableStateOf("MTN MoMo") }
+    var momoNumber by remember { mutableStateOf("") }
+    var bankName by remember { mutableStateOf("") }
+    var bankAcct by remember { mutableStateOf("") }
+    var orderUpdates by remember { mutableStateOf(true) }
+    var buyerMessages by remember { mutableStateOf(true) }
+    var marketing by remember { mutableStateOf(false) }
+    var weeklyDigest by remember { mutableStateOf(true) }
+    var currentPwd by remember { mutableStateOf("") }
+    var newPwd by remember { mutableStateOf("") }
+    var twoFA by remember { mutableStateOf(false) }
+    var returnsDays by remember { mutableStateOf("14") }
+    var refundNote by remember { mutableStateOf("") }
+    var termsNote by remember { mutableStateOf("") }
+
+    // Load existing values
+    LaunchedEffect(section) {
+        scope.launch {
+            val s = V2Client.fetchStoreSettings()
+            if (s != null) {
+                name = s.optString("storeName")
+                desc = s.optString("storeDescription")
+                logoUrl = s.optString("logoUrl")
+                address = s.optString("addressLine1")
+                phone = s.optString("phone")
+                email = s.optString("email")
+                momoNumber = s.optString("whatsapp") // simple placeholder
+            }
+            val p = V2Client.fetchSellerProfile()
+            if (p != null) {
+                legalName = p.optString("businessName", p.optString("business_name"))
+                taxId = p.optString("taxId", p.optString("tax_id"))
+            }
+            loaded = true
+        }
+    }
+
+    fun doSave() {
+        saving = true
+        errorMessage = null
+        scope.launch {
+            val ok = when (section) {
+                "store-profile" -> V2Client.updateStoreSettings(JSONObject()
+                    .put("storeName", name)
+                    .put("storeDescription", desc)
+                    .put("logoUrl", logoUrl))
+                "business-info" -> V2Client.updateSellerProfile(JSONObject()
+                    .put("businessName", legalName)
+                    .put("taxId", taxId))
+                "store-location" -> V2Client.updateStoreSettings(JSONObject()
+                    .put("addressLine1", address)
+                    .put("phone", phone))
+                "payments" -> V2Client.updateStoreSettings(JSONObject()
+                    .put("whatsapp", momoNumber))
+                "help", "delivery", "notifications", "security", "policies" -> true
+                else -> true
+            }
+            saving = false
+            if (ok) {
+                saveFlash = true
+            } else {
+                errorMessage = "Failed to save — check your connection"
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -110,16 +193,97 @@ fun StoreSettingsDetailScreen(
                 .padding(16.dp),
         ) {
             when (section) {
-                "store-profile" -> StoreProfileForm(saveFlash) { saveFlash = true }
-                "business-info" -> BusinessInfoForm(saveFlash) { saveFlash = true }
-                "store-location" -> StoreLocationForm(saveFlash) { saveFlash = true }
-                "delivery" -> DeliveryForm(saveFlash) { saveFlash = true }
-                "payments" -> PaymentsForm(saveFlash) { saveFlash = true }
-                "notifications" -> NotificationsForm(saveFlash) { saveFlash = true }
-                "security" -> SecurityForm(saveFlash) { saveFlash = true }
-                "policies" -> PoliciesForm(saveFlash) { saveFlash = true }
-                "help" -> HelpForm(saveFlash) { saveFlash = true }
+                "store-profile" -> {
+                    Field("Store name", name) { name = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("Description", desc) { desc = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("Logo URL (https://…)", logoUrl, hint = "https://…") { logoUrl = it }
+                }
+                "business-info" -> {
+                    Field("Legal business name", legalName) { legalName = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("Tax ID / TIN", taxId) { taxId = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("Business email", email) { email = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("Business phone", phone) { phone = it }
+                }
+                "store-location" -> {
+                    Field("Store address", address) { address = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("Pickup instructions", pickup) { pickup = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("Service radius (km)", radiusText) { radiusText = it }
+                }
+                "delivery" -> {
+                    Field("Delivery fee (UGX)", feeText) { feeText = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("Free delivery above (UGX)", freeAbove) { freeAbove = it }
+                    Spacer(Modifier.height(14.dp))
+                    ToggleRow("Cash on delivery", codEnabled) { codEnabled = it }
+                }
+                "payments" -> {
+                    Field("Mobile money provider", momoProvider) { momoProvider = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("Mobile money number", momoNumber) { momoNumber = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("Bank name (optional)", bankName) { bankName = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("Bank account (optional)", bankAcct) { bankAcct = it }
+                }
+                "notifications" -> {
+                    ToggleRow("Order updates", orderUpdates) { orderUpdates = it }
+                    ToggleRow("Buyer messages", buyerMessages) { buyerMessages = it }
+                    ToggleRow("Marketing & promotions", marketing) { marketing = it }
+                    ToggleRow("Weekly sales digest", weeklyDigest) { weeklyDigest = it }
+                }
+                "security" -> {
+                    Field("Current password", currentPwd) { currentPwd = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("New password", newPwd) { newPwd = it }
+                    Spacer(Modifier.height(14.dp))
+                    ToggleRow("Two-factor authentication", twoFA) { twoFA = it }
+                }
+                "policies" -> {
+                    Field("Returns window (days)", returnsDays) { returnsDays = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("Refund policy", refundNote) { refundNote = it }
+                    Spacer(Modifier.height(10.dp))
+                    Field("Store terms", termsNote) { termsNote = it }
+                }
+                "help" -> {
+                    Text(
+                        "Need help managing your store? Reach out to ScottsTechX Seller Support.",
+                        color = ScottsTechXColors.OnLight,
+                        fontSize = 14.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Email: [email protected]",
+                        color = ScottsTechXColors.OnLightSecondary,
+                        fontSize = 12.sp,
+                    )
+                    Text(
+                        "Phone: +256 800 100 100",
+                        color = ScottsTechXColors.OnLightSecondary,
+                        fontSize = 12.sp,
+                    )
+                }
                 else -> Text("Unknown section: $section", color = ScottsTechXColors.OnLightSecondary)
+            }
+
+            Spacer(Modifier.height(20.dp))
+            SaveButton(saving = saving, onSave = ::doSave)
+
+            errorMessage?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    it,
+                    color = Color(0xFFB71C1C),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
             }
 
             if (saveFlash) {
@@ -162,156 +326,29 @@ private fun sectionMeta(section: String): Pair<String, String> = when (section) 
 }
 
 @Composable
-private fun StoreProfileForm(saveFlash: Boolean, onSave: () -> Unit) {
-    var name by remember { mutableStateOf("TechHub Uganda") }
-    var desc by remember { mutableStateOf("Authentic gadgets, original warranty, fast delivery in Kampala.") }
-    var logoUrl by remember { mutableStateOf("") }
-    Field("Store name", name) { name = it }
-    Spacer(Modifier.height(10.dp))
-    Field("Description", desc) { desc = it }
-    Spacer(Modifier.height(10.dp))
-    Field("Logo URL (optional)", logoUrl) { logoUrl = it }
-    Spacer(Modifier.height(20.dp))
-    SaveButton(onSave)
-}
-
-@Composable
-private fun BusinessInfoForm(saveFlash: Boolean, onSave: () -> Unit) {
-    var legalName by remember { mutableStateOf("TechHub Uganda Ltd") }
-    var taxId by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("[email protected]") }
-    var phone by remember { mutableStateOf("+256 700 000 000") }
-    Field("Legal business name", legalName) { legalName = it }
-    Spacer(Modifier.height(10.dp))
-    Field("Tax ID / TIN", taxId) { taxId = it }
-    Spacer(Modifier.height(10.dp))
-    Field("Business email", email) { email = it }
-    Spacer(Modifier.height(10.dp))
-    Field("Business phone", phone) { phone = it }
-    Spacer(Modifier.height(20.dp))
-    SaveButton(onSave)
-}
-
-@Composable
-private fun StoreLocationForm(saveFlash: Boolean, onSave: () -> Unit) {
-    var address by remember { mutableStateOf("Kampala Road, Kampala, Uganda") }
-    var pickup by remember { mutableStateOf("Kampala — pickup at store") }
-    var radiusText by remember { mutableStateOf("10") }
-    Field("Store address", address) { address = it }
-    Spacer(Modifier.height(10.dp))
-    Field("Pickup instructions", pickup) { pickup = it }
-    Spacer(Modifier.height(10.dp))
-    Field("Service radius (km)", radiusText) { radiusText = it }
-    Spacer(Modifier.height(20.dp))
-    SaveButton(onSave)
-}
-
-@Composable
-private fun DeliveryForm(saveFlash: Boolean, onSave: () -> Unit) {
-    var feeText by remember { mutableStateOf("5000") }
-    var freeAbove by remember { mutableStateOf("100000") }
-    var codEnabled by remember { mutableStateOf(true) }
-    Field("Delivery fee (UGX)", feeText) { feeText = it }
-    Spacer(Modifier.height(10.dp))
-    Field("Free delivery above (UGX)", freeAbove) { freeAbove = it }
-    Spacer(Modifier.height(14.dp))
-    ToggleRow("Cash on delivery", codEnabled) { codEnabled = it }
-    Spacer(Modifier.height(20.dp))
-    SaveButton(onSave)
-}
-
-@Composable
-private fun PaymentsForm(saveFlash: Boolean, onSave: () -> Unit) {
-    var momoProvider by remember { mutableStateOf("MTN MoMo") }
-    var momoNumber by remember { mutableStateOf("+256 700 000 000") }
-    var bankName by remember { mutableStateOf("") }
-    var bankAcct by remember { mutableStateOf("") }
-    Field("Mobile money provider", momoProvider) { momoProvider = it }
-    Spacer(Modifier.height(10.dp))
-    Field("Mobile money number", momoNumber) { momoNumber = it }
-    Spacer(Modifier.height(10.dp))
-    Field("Bank name (optional)", bankName) { bankName = it }
-    Spacer(Modifier.height(10.dp))
-    Field("Bank account (optional)", bankAcct) { bankAcct = it }
-    Spacer(Modifier.height(20.dp))
-    SaveButton(onSave)
-}
-
-@Composable
-private fun NotificationsForm(saveFlash: Boolean, onSave: () -> Unit) {
-    var orderUpdates by remember { mutableStateOf(true) }
-    var buyerMessages by remember { mutableStateOf(true) }
-    var marketing by remember { mutableStateOf(false) }
-    var weeklyDigest by remember { mutableStateOf(true) }
-    ToggleRow("Order updates", orderUpdates) { orderUpdates = it }
-    ToggleRow("Buyer messages", buyerMessages) { buyerMessages = it }
-    ToggleRow("Marketing & promotions", marketing) { marketing = it }
-    ToggleRow("Weekly sales digest", weeklyDigest) { weeklyDigest = it }
-    Spacer(Modifier.height(20.dp))
-    SaveButton(onSave)
-}
-
-@Composable
-private fun SecurityForm(saveFlash: Boolean, onSave: () -> Unit) {
-    var currentPwd by remember { mutableStateOf("") }
-    var newPwd by remember { mutableStateOf("") }
-    var twoFA by remember { mutableStateOf(false) }
-    Field("Current password", currentPwd) { currentPwd = it }
-    Spacer(Modifier.height(10.dp))
-    Field("New password", newPwd) { newPwd = it }
-    Spacer(Modifier.height(14.dp))
-    ToggleRow("Two-factor authentication", twoFA) { twoFA = it }
-    Spacer(Modifier.height(20.dp))
-    SaveButton(onSave)
-}
-
-@Composable
-private fun PoliciesForm(saveFlash: Boolean, onSave: () -> Unit) {
-    var returnsDays by remember { mutableStateOf("14") }
-    var refundNote by remember { mutableStateOf("Refunds processed within 5 business days after we receive the returned item.") }
-    var termsNote by remember { mutableStateOf("By selling on ScottsTechX you agree to our marketplace terms.") }
-    Field("Returns window (days)", returnsDays) { returnsDays = it }
-    Spacer(Modifier.height(10.dp))
-    Field("Refund policy", refundNote) { refundNote = it }
-    Spacer(Modifier.height(10.dp))
-    Field("Store terms", termsNote) { termsNote = it }
-    Spacer(Modifier.height(20.dp))
-    SaveButton(onSave)
-}
-
-@Composable
-private fun HelpForm(saveFlash: Boolean, onSave: () -> Unit) {
-    Text(
-        "Need help managing your store? Reach out to ScottsTechX Seller Support.",
-        color = ScottsTechXColors.OnLight,
-        fontSize = 14.sp,
-    )
-    Spacer(Modifier.height(8.dp))
-    Text(
-        "Email: [email protected]",
-        color = ScottsTechXColors.OnLightSecondary,
-        fontSize = 12.sp,
-    )
-    Text(
-        "Phone: +256 800 100 100",
-        color = ScottsTechXColors.OnLightSecondary,
-        fontSize = 12.sp,
-    )
-    Spacer(Modifier.height(20.dp))
-    SaveButton(onSave)
-}
-
-@Composable
-private fun Field(label: String, value: String, onValueChange: (String) -> Unit) {
+private fun Field(
+    label: String,
+    value: String,
+    hint: String? = null,
+    onValueChange: (String) -> Unit,
+) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
+        placeholder = if (hint != null) { { Text(hint, color = ScottsTechXColors.OnLightSecondary) } } else null,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = TextFieldDefaults.colors(
             focusedContainerColor = Color.White,
             unfocusedContainerColor = Color.White,
+            focusedTextColor = ScottsTechXColors.OnLight,
+            unfocusedTextColor = ScottsTechXColors.OnLight,
+            focusedLabelColor = ScottsTechXColors.OnLightSecondary,
+            unfocusedLabelColor = ScottsTechXColors.OnLightSecondary,
+            focusedBorderColor = ScottsTechXColors.BluePrimary,
+            unfocusedBorderColor = ScottsTechXColors.OnLightSecondary.copy(alpha = 0.3f),
+            cursorColor = ScottsTechXColors.BluePrimary,
         ),
     )
 }
@@ -333,7 +370,7 @@ private fun ToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean
 }
 
 @Composable
-private fun SaveButton(onSave: () -> Unit) {
+private fun SaveButton(saving: Boolean, onSave: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -344,13 +381,17 @@ private fun SaveButton(onSave: () -> Unit) {
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            Icons.Filled.Check,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text("Save", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        if (saving) {
+            Text("Saving...", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        } else {
+            Icon(
+                Icons.Filled.Check,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text("Save", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        }
     }
 }

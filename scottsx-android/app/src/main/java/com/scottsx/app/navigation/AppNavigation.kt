@@ -475,6 +475,7 @@ fun AppNavigation() {
                         launchSingleTop = true
                     }
                 },
+                onEditProfile = { navController.navigate(Routes.ACCOUNT) },
                 onOpenSection = { section ->
                     when (section) {
                         "account" -> navController.navigate(Routes.ACCOUNT)
@@ -609,6 +610,7 @@ fun AppNavigation() {
         composable(Routes.SELLER_PROFILE_SETTINGS) {
             ProfileSettingsScreen(
                 onBack = { navController.popBackStack() },
+                onEditProfile = { navController.navigate(Routes.ACCOUNT) },
                 onOpenSection = { section ->
                     when (section) {
                         "account" -> navController.navigate(Routes.ACCOUNT)
@@ -640,6 +642,7 @@ fun AppNavigation() {
         composable(Routes.BUYER_PROFILE_SETTINGS) {
             ProfileSettingsScreen(
                 onBack = { navController.popBackStack() },
+                onEditProfile = { navController.navigate(Routes.ACCOUNT) },
                 onOpenSection = { section ->
                     when (section) {
                         "account" -> navController.navigate(Routes.ACCOUNT)

@@ -67,6 +67,7 @@ fun ProfileScreen(
     onSignOut: () -> Unit,
     onSwitchAccount: () -> Unit = {},
     onOpenSection: (String) -> Unit = {},
+    onEditProfile: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var bottomTab by remember { mutableStateOf(BottomTab.Profile) }

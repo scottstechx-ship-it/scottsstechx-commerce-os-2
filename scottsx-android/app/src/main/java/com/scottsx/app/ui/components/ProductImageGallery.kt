@@ -213,8 +213,9 @@ fun ProductImageGallery(
 private fun GalleryImage(image: ProductImage, fill: Boolean) {
     val mod = if (fill) Modifier.fillMaxSize() else Modifier
     ProductImage(
-        imageKey = image.id + image.url,
+        imageKey = image.id,
         categoryLabel = image.alt.ifBlank { "ScottsTechX" },
+        imageUrl = image.url.takeIf { it.isNotBlank() },
         modifier = mod,
     )
 }

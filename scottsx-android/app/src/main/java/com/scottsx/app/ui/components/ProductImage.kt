@@ -16,30 +16,37 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.ImageLoader
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.scottsx.app.ui.theme.ScottsTechXColors
 
 /**
- * Procedural product image — since we don't have real product
- * photos bundled, each product gets a unique gradient + abstract
- * shape based on its category. Looks like premium marketplace
- * imagery without depending on a network or external asset.
+ * Renders the real product image from [imageUrl] when available,
+ * otherwise falls back to a gradient + category-initial card.
+ *
+ * Uses Coil for HTTP loading with a crossfade transition. The
+ * fallback ensures the UI never goes blank even if the network
+ * fails or the URL is broken.
  */
 @Composable
 fun ProductImage(
     imageKey: String,
     categoryLabel: String,
+    imageUrl: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val palette = remember(imageKey) {
         palettes[imageKey.hashCode().let { (it and 0x7FFFFFFF) % palettes.size }]
     }
-    // Fast path: gradient + initial letter + a couple of overlay
-    // boxes. No Canvas, no path drawing, no continuous animation.
-    // Crisp on every screen size, ~10x faster than the previous
-    // path-based version.
+    val ctx = LocalContext.current
+    val loader = remember { ImageLoader.Builder(ctx).build() }
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
@@ -52,68 +59,60 @@ fun ProductImage(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        // Top-right accent dot
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp)
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.30f)),
-        )
-        // Bottom-left accent bar
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 8.dp, bottom = 8.dp)
-                .size(width = 36.dp, height = 4.dp)
-                .background(Color.White.copy(alpha = 0.35f)),
-        )
-        Text(
-            text = categoryLabel.firstOrNull()?.uppercase() ?: "",
-            color = Color.White.copy(alpha = 0.92f),
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 36.sp,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(4.dp),
-        )
+        if (!imageUrl.isNullOrBlank()) {
+            // Load real image from the network (Unsplash, Firebase, etc.)
+            AsyncImage(
+                model = ImageRequest.Builder(ctx)
+                    .data(imageUrl)
+                    .crossfade(true)
+                    .build(),
+                imageLoader = loader,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            // Top-right accent dot
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.30f)),
+            )
+            // Bottom-left accent bar
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 8.dp, bottom = 8.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .background(Color.White.copy(alpha = 0.35f)),
+            )
+            Text(
+                text = categoryLabel.firstOrNull()?.uppercase() ?: "",
+                color = Color.White.copy(alpha = 0.92f),
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 36.sp,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(4.dp),
+            )
+        }
     }
 }
 
 private data class Palette(
     val gradient: List<Color>,
-    val ring: Color,
-    val blob: Color,
 )
 
 private val palettes = listOf(
-    Palette(  // 0 - blue-purple (default)
-        gradient = listOf(Color(0xFF3B82F6), Color(0xFF7C3AED)),
-        ring = Color.White, blob = Color(0xFF8B5CF6),
-    ),
-    Palette(  // 1 - cyan-teal
-        gradient = listOf(Color(0xFF06B6D4), Color(0xFF0EA5E9)),
-        ring = Color.White, blob = Color(0xFF22D3EE),
-    ),
-    Palette(  // 2 - emerald-lime
-        gradient = listOf(Color(0xFF059669), Color(0xFF65A30D)),
-        ring = Color.White, blob = Color(0xFFA3E635),
-    ),
-    Palette(  // 3 - rose-fuchsia
-        gradient = listOf(Color(0xFFE11D48), Color(0xFFA21CAF)),
-        ring = Color.White, blob = Color(0xFFFB7185),
-    ),
-    Palette(  // 4 - amber-orange
-        gradient = listOf(Color(0xFFF59E0B), Color(0xFFEA580C)),
-        ring = Color.White, blob = Color(0xFFFBBF24),
-    ),
-    Palette(  // 5 - slate-navy
-        gradient = listOf(Color(0xFF1E3A8A), Color(0xFF0F172A)),
-        ring = ScottsTechXColors.BluePrimaryLight, blob = Color(0xFF3B82F6),
-    ),
-    Palette(  // 6 - pink-purple
-        gradient = listOf(Color(0xFFEC4899), Color(0xFF8B5CF6)),
-        ring = Color.White, blob = Color(0xFFF9A8D4),
-    ),
+    Palette(listOf(Color(0xFF1E40AF), Color(0xFF7C3AED), Color(0xFFEC4899))),
+    Palette(listOf(Color(0xFF059669), Color(0xFF0891B2), Color(0xFF1E40AF))),
+    Palette(listOf(Color(0xFFDC2626), Color(0xFFEA580C), Color(0xFFF59E0B))),
+    Palette(listOf(Color(0xFF7C3AED), Color(0xFFEC4899), Color(0xFFF43F5E))),
+    Palette(listOf(Color(0xFF0891B2), Color(0xFF1E40AF), Color(0xFF312E81))),
+    Palette(listOf(Color(0xFFB45309), Color(0xFF92400E), Color(0xFF78350F))),
+    Palette(listOf(Color(0xFFBE185D), Color(0xFF9D174D), Color(0xFF831843))),
+    Palette(listOf(Color(0xFF0F766E), Color(0xFF0D9488), Color(0xFF14B8A6))),
 )
