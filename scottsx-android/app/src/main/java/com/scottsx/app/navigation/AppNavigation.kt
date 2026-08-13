@@ -48,6 +48,7 @@ import com.scottsx.app.ui.screens.ReviewsScreen
 import com.scottsx.app.ui.screens.SellerAnalyticsScreen
 import com.scottsx.app.ui.screens.SellerHomeScreen
 import com.scottsx.app.ui.screens.SellerMessagesScreen
+import com.scottsx.app.ui.screens.ThemeScreen
 import com.scottsx.app.ui.screens.SellerOrdersScreen
 import com.scottsx.app.ui.screens.SellerStorefrontScreen
 import com.scottsx.app.ui.screens.SignUpScreen
@@ -473,6 +474,33 @@ fun AppNavigation() {
                         launchSingleTop = true
                     }
                 },
+                onOpenSection = { section ->
+                    when (section) {
+                        "account" -> navController.navigate(Routes.ACCOUNT)
+                        "addresses" -> navController.navigate(Routes.ADDRESSES)
+                        "saved-locations" -> navController.navigate(Routes.ADDRESSES)
+                        "payments" -> navController.navigate(Routes.PAYMENT_METHODS)
+                        "orders" -> navController.navigate(Routes.MY_ORDERS)
+                        "track-orders" -> navController.navigate(Routes.MY_ORDERS)
+                        "refunds" -> navController.navigate(Routes.REFUNDS)
+                        "saved-products" -> navController.navigate(Routes.SAVED_PRODUCTS)
+                        "saved-sellers" -> navController.navigate(Routes.SAVED_SELLERS)
+                        "nearby" -> navController.navigate(Routes.NEARBY)
+                        "ai" -> navController.navigate(Routes.AI)
+                        "notifications" -> navController.navigate(Routes.NOTIFICATIONS)
+                        "messages" -> navController.navigate(Routes.MESSAGES)
+                        "buyer-protection" -> navController.navigate(Routes.cmsPath("buyer-protection"))
+                        "theme" -> navController.navigate(Routes.THEME)
+                        "language" -> navController.navigate(Routes.LANGUAGE)
+                        "currency" -> navController.navigate(Routes.CURRENCY)
+                        "help" -> navController.navigate(Routes.HELP)
+                        "contact" -> navController.navigate(Routes.CONTACT)
+                        "report" -> navController.navigate(Routes.REPORT)
+                        "terms" -> navController.navigate(Routes.cmsPath("terms"))
+                        "privacy-policy" -> navController.navigate(Routes.cmsPath("privacy"))
+                        else -> Unit
+                    }
+                },
             )
         }
         // =====================================================================
@@ -566,6 +594,37 @@ fun AppNavigation() {
             StoreSettingsScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.SELLER_PROFILE_SETTINGS) {
+            ProfileSettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenSection = { section ->
+                    when (section) {
+                        "account" -> navController.navigate(Routes.ACCOUNT)
+                        "security" -> navController.navigate(Routes.SECURITY)
+                        "addresses" -> navController.navigate(Routes.ADDRESSES)
+                        "payments" -> navController.navigate(Routes.PAYMENT_METHODS)
+                        "notifications" -> navController.navigate(Routes.NOTIFICATION_PREFS)
+                        "privacy" -> navController.navigate(Routes.PRIVACY)
+                        "language" -> navController.navigate(Routes.LANGUAGE)
+                        "currency" -> navController.navigate(Routes.CURRENCY)
+                        "theme" -> navController.navigate(Routes.THEME)
+                        "orders" -> navController.navigate(Routes.MY_ORDERS)
+                        "saved-products" -> navController.navigate(Routes.SAVED_PRODUCTS)
+                        "saved-sellers" -> navController.navigate(Routes.SAVED_SELLERS)
+                        "buyer-protection" -> navController.navigate(Routes.cmsPath("buyer-protection"))
+                        "help" -> navController.navigate(Routes.HELP)
+                        "contact" -> navController.navigate(Routes.CONTACT)
+                        "report" -> navController.navigate(Routes.REPORT)
+                        "terms" -> navController.navigate(Routes.cmsPath("terms"))
+                        "privacy-policy" -> navController.navigate(Routes.cmsPath("privacy"))
+                        "about" -> navController.navigate(Routes.cmsPath("about"))
+                        "audit" -> navController.navigate(Routes.AUDIT)
+                        "delete-account" -> navController.navigate(Routes.DELETE_ACCOUNT)
+                        else -> Unit
+                    }
+                },
+            )
+        }
+        composable(Routes.BUYER_PROFILE_SETTINGS) {
             ProfileSettingsScreen(
                 onBack = { navController.popBackStack() },
                 onOpenSection = { section ->
@@ -760,7 +819,19 @@ fun AppNavigation() {
             arguments = listOf(navArgument("slug") { type = NavType.StringType })
         ) { backStackEntry ->
             val slug = backStackEntry.arguments?.getString("slug") ?: "about"
-            CmsScreen(slug = slug, onBack = { navController.popBackStack() })
+            CmsScreen(
+                slug = slug,
+                title = when (slug) {
+                    "terms" -> "Terms of Service"
+                    "privacy" -> "Privacy Policy"
+                    "about" -> "About ScottsTechX"
+                    "buyer-protection" -> "Buyer Protection"
+                    "help" -> "Help Center"
+                    "contact" -> "Contact"
+                    else -> slug.replaceFirstChar { it.uppercase() }
+                },
+                onBack = { navController.popBackStack() },
+            )
         }
         composable(Routes.DELETE_ACCOUNT) { DeleteAccountScreen(onBack = { navController.popBackStack() }, onConfirm = { navController.popBackStack() }) }
         composable(Routes.PRIVACY) { CmsScreen(slug = "privacy", title = "Privacy Policy", onBack = { navController.popBackStack() }) }
@@ -879,6 +950,7 @@ object Routes {
     const val SELLER_TOOLS = "seller/marketplace-tools"
     const val SELLER_STORE_SETTINGS = "seller/store-settings"
     const val SELLER_PROFILE_SETTINGS = "seller/profile-settings"
+    const val BUYER_PROFILE_SETTINGS = "buyer/profile-settings"
 
     // ---- Stage 4 transaction / receipt / AI routes ----
     const val TRANSACTIONS = "transactions"
@@ -907,6 +979,7 @@ object Routes {
     const val PRIVACY = "settings/privacy"
     const val LANGUAGE = "settings/language"
     const val CURRENCY = "settings/currency"
+    const val THEME = "settings/theme"
     const val MY_ORDERS = "settings/my-orders"
     const val TRACK_ORDER = "settings/track-order/{orderId}"
     const val SAVED_PRODUCTS = "settings/saved-products"

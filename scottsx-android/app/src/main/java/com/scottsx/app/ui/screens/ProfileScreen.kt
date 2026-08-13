@@ -66,6 +66,7 @@ fun ProfileScreen(
     onTabSelect: (BottomTab) -> Unit,
     onSignOut: () -> Unit,
     onSwitchAccount: () -> Unit = {},
+    onOpenSection: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var bottomTab by remember { mutableStateOf(BottomTab.Profile) }
@@ -147,53 +148,53 @@ fun ProfileScreen(
             item {
                 Spacer(Modifier.size(8.dp))
                 SectionGroup(title = "ACCOUNT") {
-                    Setting(Icons.Filled.Settings, "Personal Information", "Name, email, phone")
-                    Setting(Icons.Filled.LocationOn, "Addresses", "Manage delivery addresses")
-                    Setting(Icons.Filled.Home, "Saved Locations", "Home, work, other")
-                    Setting(Icons.Filled.CreditCard, "Payment Methods", "Mobile money, cards")
+                    Setting(Icons.Filled.Settings, "Personal Information", "Name, email, phone") { onOpenSection("account") }
+                    Setting(Icons.Filled.LocationOn, "Addresses", "Manage delivery addresses") { onOpenSection("addresses") }
+                    Setting(Icons.Filled.Home, "Saved Locations", "Home, work, other") { onOpenSection("saved-locations") }
+                    Setting(Icons.Filled.CreditCard, "Payment Methods", "Mobile money, cards") { onOpenSection("payments") }
                 }
             }
 
             // SHOPPING
             item {
                 SectionGroup(title = "SHOPPING") {
-                    Setting(Icons.Filled.Receipt, "My Orders", "Track and view orders")
-                    Setting(Icons.Filled.ShoppingBag, "Track Orders", "Live tracking")
-                    Setting(Icons.Filled.Refresh, "Returns & Refunds", "Recent returns")
-                    Setting(Icons.Filled.Favorite, "Saved Products", "Your favorites")
-                    Setting(Icons.Filled.Star, "Favorite Sellers", "Sellers you follow")
+                    Setting(Icons.Filled.Receipt, "My Orders", "Track and view orders") { onOpenSection("orders") }
+                    Setting(Icons.Filled.ShoppingBag, "Track Orders", "Live tracking") { onOpenSection("track-orders") }
+                    Setting(Icons.Filled.Refresh, "Returns & Refunds", "Recent returns") { onOpenSection("refunds") }
+                    Setting(Icons.Filled.Favorite, "Saved Products", "Your favorites") { onOpenSection("saved-products") }
+                    Setting(Icons.Filled.Star, "Favorite Sellers", "Sellers you follow") { onOpenSection("saved-sellers") }
                 }
             }
 
             // MARKETPLACE
             item {
                 SectionGroup(title = "MARKETPLACE") {
-                    Setting(Icons.Filled.LocationOn, "Nearby", "Find products near you")
-                    Setting(Icons.Filled.SmartToy, "AI Assistant", "Smart recommendations")
-                    Setting(Icons.Filled.Notifications, "Notifications", "Manage push alerts")
-                    Setting(Icons.Filled.Receipt, "Seller Messages", "Your conversations")
-                    Setting(Icons.Filled.PrivacyTip, "Buyer Protection", "Shop safely")
+                    Setting(Icons.Filled.LocationOn, "Nearby", "Find products near you") { onOpenSection("nearby") }
+                    Setting(Icons.Filled.SmartToy, "AI Assistant", "Smart recommendations") { onOpenSection("ai") }
+                    Setting(Icons.Filled.Notifications, "Notifications", "Manage push alerts") { onOpenSection("notifications") }
+                    Setting(Icons.Filled.Receipt, "Seller Messages", "Your conversations") { onOpenSection("messages") }
+                    Setting(Icons.Filled.PrivacyTip, "Buyer Protection", "Shop safely") { onOpenSection("buyer-protection") }
                 }
             }
 
             // APP
             item {
                 SectionGroup(title = "APP") {
-                    Setting(Icons.Filled.DarkMode, "Appearance", "Light / Dark mode")
-                    Setting(Icons.Filled.Settings, "Language", "English (Uganda)")
-                    Setting(Icons.Filled.History, "Currency", "UGX — Uganda Shilling")
-                    Setting(Icons.Filled.Notifications, "Notification Settings", "Sounds, alerts")
+                    Setting(Icons.Filled.DarkMode, "Appearance", "Light / Dark mode") { onOpenSection("theme") }
+                    Setting(Icons.Filled.Settings, "Language", "English (Uganda)") { onOpenSection("language") }
+                    Setting(Icons.Filled.History, "Currency", "UGX — Uganda Shilling") { onOpenSection("currency") }
+                    Setting(Icons.Filled.Notifications, "Notification Settings", "Sounds, alerts") { onOpenSection("notifications") }
                 }
             }
 
             // SUPPORT
             item {
                 SectionGroup(title = "SUPPORT") {
-                    Setting(Icons.Filled.Help, "Help Center", "FAQs and guides")
-                    Setting(Icons.Filled.SupportAgent, "Contact ScottsTechX", "Reach support")
-                    Setting(Icons.Filled.Lock, "Report a Problem", "Send a bug report")
-                    Setting(Icons.Filled.Description, "Terms of Service", "Read terms")
-                    Setting(Icons.Filled.PrivacyTip, "Privacy Policy", "Read policy")
+                    Setting(Icons.Filled.Help, "Help Center", "FAQs and guides") { onOpenSection("help") }
+                    Setting(Icons.Filled.SupportAgent, "Contact ScottsTechX", "Reach support") { onOpenSection("contact") }
+                    Setting(Icons.Filled.Lock, "Report a Problem", "Send a bug report") { onOpenSection("report") }
+                    Setting(Icons.Filled.Description, "Terms of Service", "Read terms") { onOpenSection("terms") }
+                    Setting(Icons.Filled.PrivacyTip, "Privacy Policy", "Read policy") { onOpenSection("privacy-policy") }
                 }
             }
 
