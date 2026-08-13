@@ -27,7 +27,7 @@ import com.scottsx.app.ui.theme.ScottsTechXColors
  * Profile settings hub. Every row routes to a real destination via
  * [onOpenSection]. The 11 sections cover:
  *  - Account       (avatar, name, email, phone, bio, gender, DoB)
- *  - Security      (password, 2FA) -- placeholder
+ *  - Security      (password, 2FA) -- routes to SecurityScreen
  *  - Addresses     (saved delivery addresses)
  *  - Payments      (saved payment methods)
  *  - Notifications (notification settings)
