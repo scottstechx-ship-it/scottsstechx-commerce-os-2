@@ -87,7 +87,19 @@ fun RealAiChatScreen(
         turns.add(ChatTurnUi(role = "user", content = text))
         input = ""
         scope.launch {
-            val reply = V2Client.ask(text, screen = "ai-chat")
+            // Load the entire marketplace catalog so the AI can reason
+            // over real, live store inventory — not generic knowledge.
+            val products = runCatching { V2Client.fetchProductsList() }.getOrDefault(emptyList())
+            val catalogCtx = if (products.isNotEmpty()) {
+                val brief = products.take(40).joinToString("\n") { p ->
+                    "- ${p.title} (${p.category}) UGX ${p.priceUgx} from ${p.seller.name} [id=${p.id}]"
+                }
+                "Live marketplace catalog (${products.size} products):\n$brief\n"
+            } else {
+                "Live marketplace catalog is empty right now.\n"
+            }
+            val fullMessage = "$catalogCtx\nUser question: $text"
+            val reply = V2Client.ask(fullMessage, screen = "ai-chat")
             val replyText = reply?.text
                 ?: "I can't reach the AI service right now. Check your connection or try again."
             turns.add(

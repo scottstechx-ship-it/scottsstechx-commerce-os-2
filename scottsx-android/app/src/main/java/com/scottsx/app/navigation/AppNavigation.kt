@@ -46,6 +46,7 @@ import com.scottsx.app.ui.screens.ProductDetailScreen
 import com.scottsx.app.ui.screens.ProfileSettingsScreen
 import com.scottsx.app.ui.screens.ReviewsScreen
 import com.scottsx.app.ui.screens.SellerAnalyticsScreen
+import com.scottsx.app.ui.screens.SellerAIAssistantScreen
 import com.scottsx.app.ui.screens.SellerHomeScreen
 import com.scottsx.app.ui.screens.SellerMessagesScreen
 import com.scottsx.app.ui.screens.ThemeScreen
@@ -391,7 +392,7 @@ fun AppNavigation() {
                 // shared AiAssistantScreen (same one the buyer uses); the
                 // header is the same — the seller gets a Seller AI tab on
                 // the AI assistant screen via header context.
-                onOpenSellerAi = { navController.navigate(Routes.AI) },
+                onOpenSellerAi = { navController.navigate(Routes.SELLER_AI) },
                 onOpenSellerMessages = { navController.navigate(Routes.SELLER_MESSAGES) },
             )
         }
@@ -414,6 +415,9 @@ fun AppNavigation() {
                 onOpenProduct = { p: com.scottsx.app.data.domain.Product -> navController.navigate(Routes.product(p.id)) },
                 onTabSelect = { tab: BottomTab -> onBuyerTab(navController, tab) },
             )
+        }
+        composable(Routes.SELLER_AI) {
+            SellerAIAssistantScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.SEARCH) {
             SearchScreen(
@@ -946,6 +950,7 @@ object Routes {
     const val CART = "cart"
     const val NEARBY = "nearby"
     const val AI = "ai"
+    const val SELLER_AI = "seller/ai"
     const val SEARCH = "search"
     const val CATEGORIES = "categories"
     const val WISHLIST = "wishlist"

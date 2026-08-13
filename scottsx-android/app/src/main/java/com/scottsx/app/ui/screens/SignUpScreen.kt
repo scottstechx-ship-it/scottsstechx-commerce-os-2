@@ -87,6 +87,12 @@ fun SignUpScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
+    // Stage 5.x email verification state
+    var emailVerified by remember { mutableStateOf(false) }
+    var verificationCode by remember { mutableStateOf("") }
+    var generatedCode by remember { mutableStateOf<String?>(null) }
+    var verifyingEmail by remember { mutableStateOf(false) }
+
     // Seller-only fields
     var businessName by remember { mutableStateOf("") }
     var businessType by remember { mutableStateOf(BusinessType.Retail) }
@@ -218,11 +224,63 @@ fun SignUpScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 InputField(
                     value = email,
-                    onValueChange = { email = it; errorMsg = null },
+                    onValueChange = { email = it; errorMsg = null; emailVerified = false; generatedCode = null },
                     label = "Email Address",
                     placeholder = "Enter your email",
                     keyboardType = KeyboardType.Email,
+                    isError = !isValidEmail(email) && email.isNotEmpty(),
+                    errorMessage = if (!isValidEmail(email) && email.isNotEmpty()) "Enter a valid email address" else null,
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                // Email verification block
+                if (email.isNotBlank() && isValidEmail(email) && !emailVerified) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = {
+                                verifyingEmail = true
+                                // Simulate code generation. The real backend
+                                // would POST /api/v1/auth/send-code and email it.
+                                generatedCode = (100000 + (System.currentTimeMillis() % 899999)).toString()
+                                verifyingEmail = false
+                            },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(if (generatedCode == null) "Send verification code" else "Resend code")
+                        }
+                    }
+                    if (generatedCode != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        InputField(
+                            value = verificationCode,
+                            onValueChange = { verificationCode = it; errorMsg = null },
+                            label = "Verification Code",
+                            placeholder = "Enter the 6-digit code we emailed you",
+                            keyboardType = KeyboardType.Number,
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        androidx.compose.material3.Button(
+                            onClick = {
+                                emailVerified = verificationCode == generatedCode
+                                if (!emailVerified) errorMsg = "Incorrect code — check your email."
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = if (emailVerified) ScottsTechXColors.BluePrimary else ScottsTechXColors.BluePrimaryLight
+                            ),
+                            enabled = verificationCode.length == 6,
+                        ) {
+                            Text(if (emailVerified) "Email verified" else "Verify code")
+                        }
+                    }
+                } else if (emailVerified) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("✅ Email verified", color = ScottsTechXColors.BluePrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
                 Spacer(modifier = Modifier.height(12.dp))
                 InputField(
                     value = phone,
@@ -355,6 +413,10 @@ fun SignUpScreen(
                                 errorMsg = "Please enter a valid NIN / National ID."
                                 return@PrimaryButton
                             }
+                        }
+                        if (!emailVerified) {
+                            errorMsg = "Please verify your email address before creating the account."
+                            return@PrimaryButton
                         }
                         errorMsg = null
                         loading = true
@@ -508,4 +570,8 @@ private fun BusinessTypePicker(selected: BusinessType, onSelect: (BusinessType) 
             }
         }
     }
+}
+
+private fun isValidEmail(s: String): Boolean {
+    return android.util.Patterns.EMAIL_ADDRESS.matcher(s).matches()
 }

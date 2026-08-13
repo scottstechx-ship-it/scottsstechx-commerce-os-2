@@ -4,6 +4,11 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.border
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -94,6 +99,12 @@ fun NearbyScreen(
     var lng by remember { mutableStateOf<Double?>(null) }
     var gpsStatus by remember { mutableStateOf("idle") } // "idle" | "requesting" | "ready" | "unavailable"
     val provider = remember { LocationProvider(context) }
+
+    // Filter & sort state — Stage 5.x advanced UI
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var sortBy by remember { mutableStateOf("distance") } // "distance" | "rating" | "products"
+    var maxRadiusKm by remember { mutableStateOf(20) }
+    var onlyVerified by remember { mutableStateOf(false) }
 
     // API state
     var isLoading by remember { mutableStateOf(false) }
@@ -270,6 +281,22 @@ fun NearbyScreen(
                 }
             }
 
+            // Filter / sort bar (Stage 5.x advanced UI)
+            item {
+                androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
+                FilterSortBar(
+                    selectedCategory = selectedCategory,
+                    onCategoryChange = { selectedCategory = it },
+                    sortBy = sortBy,
+                    onSortChange = { sortBy = it },
+                    maxRadiusKm = maxRadiusKm,
+                    onRadiusChange = { maxRadiusKm = it },
+                    onlyVerified = onlyVerified,
+                    onOnlyVerifiedChange = { onlyVerified = it },
+                )
+                androidx.compose.foundation.layout.Spacer(Modifier.height(4.dp))
+            }
+
             // Result count + status
             item {
                 Row(
@@ -292,7 +319,7 @@ fun NearbyScreen(
                             modifier = Modifier.size(16.dp),
                         )
                         else -> Text(
-                            text = "${nearbySellers.size} results",
+                            text = "${filteredSellers.size} sellers",
                             color = ScottsTechXColors.OnLightSecondary,
                             fontSize = 12.sp,
                         )
@@ -321,7 +348,19 @@ fun NearbyScreen(
             }
 
             // Sellers
-            items(nearbySellers, key = { it.sellerId }) { seller ->
+            // Apply radius filter + sort to the local list
+            val filteredSellers = nearbySellers
+                .asSequence()
+                .filter { maxRadiusKm == 0 || it.distanceKm <= maxRadiusKm }
+                .sortedWith(
+                    when (sortBy) {
+                        "rating" -> compareByDescending<V2Client.NearbySeller> { it.rating }
+                        "products" -> compareByDescending<V2Client.NearbySeller> { it.products.size }
+                        else -> compareBy<V2Client.NearbySeller> { it.distanceKm }
+                    }
+                )
+                .toList()
+            items(filteredSellers, key = { it.sellerId }) { seller ->
                 NearbySellerRow(
                     seller = seller,
                     onClick = {
@@ -619,5 +658,173 @@ private fun LocationChip(label: String, selected: Boolean, onClick: () -> Unit) 
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
             fontSize = 12.sp,
         )
+    }
+}
+
+
+@Composable
+private fun FilterSortBar(
+    selectedCategory: String?,
+    onCategoryChange: (String?) -> Unit,
+    sortBy: String,
+    onSortChange: (String) -> Unit,
+    maxRadiusKm: Int,
+    onRadiusChange: (Int) -> Unit,
+    onlyVerified: Boolean,
+    onOnlyVerifiedChange: (Boolean) -> Unit,
+) {
+    val categories = listOf(
+        "All", "Electronics", "Fashion", "Footwear", "Beauty", "Home", "Sports",
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        // Category chips row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            categories.forEach { cat ->
+                val isSelected = (cat == "All" && selectedCategory == null) || cat == selectedCategory
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            if (isSelected) ScottsTechXColors.BluePrimary
+                            else Color.White
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = if (isSelected) ScottsTechXColors.BluePrimary
+                                    else ScottsTechXColors.OnLightSecondary.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(50),
+                        )
+                        .clickable {
+                            onCategoryChange(if (cat == "All") null else cat)
+                        }
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        cat,
+                        color = if (isSelected) Color.White else ScottsTechXColors.OnLight,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        // Sort + radius + verified row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Sort pill
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White)
+                    .border(1.dp, ScottsTechXColors.OnLightSecondary.copy(alpha = 0.3f), RoundedCornerShape(50))
+                    .clickable {
+                        onSortChange(
+                            when (sortBy) {
+                                "distance" -> "rating"
+                                "rating" -> "products"
+                                else -> "distance"
+                            }
+                        )
+                    }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        androidx.compose.material.icons.Icons.Filled.Star,
+                        contentDescription = null,
+                        tint = ScottsTechXColors.BluePrimary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = when (sortBy) {
+                            "distance" -> "Nearest"
+                            "rating" -> "Top rated"
+                            else -> "Most products"
+                        },
+                        color = ScottsTechXColors.OnLight,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+            // Radius pill
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White)
+                    .border(1.dp, ScottsTechXColors.OnLightSecondary.copy(alpha = 0.3f), RoundedCornerShape(50))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    text = "≤ $maxRadiusKm km",
+                    color = ScottsTechXColors.OnLight,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                )
+            }
+            // Verified-only toggle pill
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(
+                        if (onlyVerified) ScottsTechXColors.BluePrimary
+                        else Color.White
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (onlyVerified) ScottsTechXColors.BluePrimary
+                                else ScottsTechXColors.OnLightSecondary.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(50),
+                    )
+                    .clickable { onOnlyVerifiedChange(!onlyVerified) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    text = if (onlyVerified) "Verified only" else "All sellers",
+                    color = if (onlyVerified) Color.White else ScottsTechXColors.OnLight,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 12.sp,
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        // Radius slider
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Radius",
+                color = ScottsTechXColors.OnLightSecondary,
+                fontSize = 11.sp,
+                modifier = Modifier.width(48.dp),
+            )
+            Slider(
+                value = maxRadiusKm.toFloat(),
+                onValueChange = { onRadiusChange(it.toInt()) },
+                valueRange = 1f..100f,
+                steps = 0,
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = ScottsTechXColors.BluePrimary,
+                    activeTrackColor = ScottsTechXColors.BluePrimary,
+                    inactiveTrackColor = ScottsTechXColors.OnLightSecondary.copy(alpha = 0.3f),
+                ),
+            )
+        }
     }
 }

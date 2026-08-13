@@ -415,6 +415,9 @@ data class Message(
     val timeLabel: String,         // "10:30 AM"
     val isFromBuyer: Boolean,
     val productContextId: String? = null, // PDP auto-attached product
+    val isRead: Boolean = false,
+    val isDelivered: Boolean = true,
+    val isTyping: Boolean = false,
 )
 
 /** A buyer↔seller conversation. */

@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -71,6 +72,11 @@ fun AddProductScreen(
     var step by remember { mutableStateOf(0) }
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
+    // Stage 5.x AI-generated fields (when seller adds a photo URL)
+    var aiSuggestedName by remember { mutableStateOf<String?>(null) }
+    var aiSuggestedDesc by remember { mutableStateOf<String?>(null) }
+    var aiSuggestedCategory by remember { mutableStateOf<ProductCategory?>(null) }
+    var aiGenerating by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf(ProductCategory.All) }
     var priceText by remember { mutableStateOf("") }
     var discountText by remember { mutableStateOf("0") }
@@ -138,6 +144,113 @@ fun AddProductScreen(
                     InputField(value = name, onValueChange = { name = it }, label = "Product name")
                     Spacer(Modifier.height(10.dp))
                     InputField(value = description, onValueChange = { description = it }, label = "Description")
+                    Spacer(Modifier.height(10.dp))
+                    // Stage 5.x: AI helper. Seller enters a short hint (or
+                    // uses the first photo URL as context), and we fill
+                    // title, description, and category automatically.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = {
+                                if (imageUrls.isEmpty()) return@OutlinedButton
+                                aiGenerating = true
+                                // Heuristic AI suggestion based on the image
+                                // filename / URL. The real backend would
+                                // POST /api/v1/ai/v2/generate-product with the
+                                // image bytes + hint and return structured fields.
+                                val first = imageUrls.first().lowercase()
+                                aiSuggestedName = when {
+                                    "phone" in first || "iphone" in first || "samsung" in first -> "Premium Smartphone — Like New"
+                                    "laptop" in first || "macbook" in first -> "High-Performance Laptop"
+                                    "shoe" in first || "sneaker" in first || "nike" in first -> "Stylish Sneakers — Premium Quality"
+                                    "dress" in first || "ankara" in first || "kitenge" in first -> "Traditional African Outfit"
+                                    "rice" in first || "food" in first -> "Quality Food Item"
+                                    "headphone" in first -> "Wireless Headphones — Premium Audio"
+                                    "lipstick" in first || "makeup" in first -> "Premium Beauty Product"
+                                    "watch" in first -> "Elegant Timepiece"
+                                    else -> "Quality Product from a Verified Seller"
+                                }
+                                aiSuggestedDesc = "Carefully sourced and inspected before listing. " +
+                                    "Buy with confidence from a trusted ScottsTechX seller. " +
+                                    "Free local delivery in Kampala, fast shipping nationwide."
+                                aiSuggestedCategory = when {
+                                    "phone" in first || "iphone" in first || "samsung" in first ||
+                                    "laptop" in first || "macbook" in first ||
+                                    "headphone" in first || "watch" in first -> ProductCategory.Electronics
+                                    "shoe" in first || "sneaker" in first || "nike" in first -> ProductCategory.Footwear
+                                    "dress" in first || "ankara" in first || "kitenge" in first -> ProductCategory.Fashion
+                                    "lipstick" in first || "makeup" in first -> ProductCategory.Beauty
+                                    "rice" in first -> ProductCategory.Groceries
+                                    else -> ProductCategory.Electronics
+                                }
+                                aiGenerating = false
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = imageUrls.isNotEmpty() && !aiGenerating,
+                        ) {
+                            if (aiGenerating) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text("Generating...", fontSize = 12.sp)
+                            } else {
+                                Icon(
+                                    androidx.compose.material.icons.Icons.Filled.AutoAwesome,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text("AI suggest from photo", fontSize = 12.sp)
+                            }
+                        }
+                    }
+                    if (aiSuggestedName != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("✨ AI suggestion ready", color = ScottsTechXColors.BluePrimary, fontSize = 11.sp)
+                            Spacer(Modifier.weight(1f))
+                            androidx.compose.material3.TextButton(onClick = {
+                                aiSuggestedName = null
+                                aiSuggestedDesc = null
+                                aiSuggestedCategory = null
+                            }) {
+                                Text("Dismiss", fontSize = 11.sp)
+                            }
+                            androidx.compose.material3.TextButton(onClick = {
+                                aiSuggestedName?.let { name = it }
+                                aiSuggestedDesc?.let { description = it }
+                                aiSuggestedCategory?.let { category = it }
+                                aiSuggestedName = null
+                                aiSuggestedDesc = null
+                                aiSuggestedCategory = null
+                            }) {
+                                Text("Apply", fontSize = 11.sp)
+                            }
+                        }
+                        // Show preview
+                        Text(
+                            text = "→ ${aiSuggestedName.orEmpty()}",
+                            color = ScottsTechXColors.OnLight,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp,
+                        )
+                        Text(
+                            text = aiSuggestedDesc.orEmpty().take(140) + if ((aiSuggestedDesc?.length ?: 0) > 140) "..." else "",
+                            color = ScottsTechXColors.OnLightSecondary,
+                            fontSize = 11.sp,
+                        )
+                        Text(
+                            text = "→ ${aiSuggestedCategory?.displayName ?: ""}",
+                            color = ScottsTechXColors.BluePrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
                     Spacer(Modifier.height(16.dp))
                     Text("Category", color = ScottsTechXColors.OnLightSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))

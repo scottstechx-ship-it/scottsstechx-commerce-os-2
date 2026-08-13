@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Storefront
@@ -38,6 +39,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -99,6 +101,38 @@ fun MessageThreadScreen(
             }
             items(messagesState, key = { it.id }) { msg ->
                 MessageBubble(msg)
+            }
+        }
+        // Typing indicator (above the composer)
+        var isPeerTyping by remember { mutableStateOf(false) }
+        if (isPeerTyping) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.White)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    androidx.compose.foundation.Canvas(
+                        modifier = Modifier.size(18.dp, 6.dp)
+                    ) {
+                        drawCircle(color = ScottsTechXColors.OnLightSecondary.copy(alpha = 0.6f), radius = 3f)
+                        drawCircle(color = ScottsTechXColors.OnLightSecondary.copy(alpha = 0.4f), radius = 3f, center = Offset(6f, 0f))
+                        drawCircle(color = ScottsTechXColors.OnLightSecondary.copy(alpha = 0.4f), radius = 3f, center = Offset(12f, 0f))
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "${thread.sellerName} is typing...",
+                        fontSize = 11.sp,
+                        color = ScottsTechXColors.OnLightSecondary,
+                    )
+                }
             }
         }
         // Composer
@@ -256,14 +290,32 @@ private fun MessageBubble(msg: Message) {
 @Composable
 private fun ComposerBar(onSend: (String) -> Unit) {
     var text by remember { mutableStateOf("") }
+    var showQuickReplies by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.White)
             .navigationBarsPadding()
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 6.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Attach button
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .clickable { /* TODO: open image/file picker */ },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = "Attach",
+                tint = ScottsTechXColors.OnLightSecondary,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.width(2.dp))
+        // Input field
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -281,19 +333,63 @@ private fun ComposerBar(onSend: (String) -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(2.dp))
+        // Quick replies toggle
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .clickable { showQuickReplies = !showQuickReplies },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                androidx.compose.material.icons.Icons.Filled.Star,
+                contentDescription = "Quick replies",
+                tint = ScottsTechXColors.OnLightSecondary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(Modifier.width(2.dp))
+        // Send button
         Box(
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(ScottsTechXColors.BluePrimary)
+                .background(
+                    if (text.isNotBlank()) ScottsTechXColors.BluePrimary
+                    else ScottsTechXColors.OnLightSecondary.copy(alpha = 0.3f)
+                )
                 .clickable(enabled = text.isNotBlank()) {
                     onSend(text.trim())
                     text = ""
+                    showQuickReplies = false
                 },
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(18.dp))
+        }
+    }
+    // Quick replies bar
+    if (showQuickReplies) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(ScottsTechXColors.PanelInputLight)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            listOf("Got it", "On the way", "Thanks!", "Will check").forEach { reply ->
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.White)
+                        .clickable { text = reply },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(reply, fontSize = 13.sp, color = ScottsTechXColors.OnLight,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+                }
+            }
         }
     }
 }
