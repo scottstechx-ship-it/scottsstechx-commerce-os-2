@@ -578,6 +578,7 @@ fun AppNavigation() {
                         "privacy" -> navController.navigate(Routes.PRIVACY)
                         "language" -> navController.navigate(Routes.LANGUAGE)
                         "currency" -> navController.navigate(Routes.CURRENCY)
+                        "theme" -> navController.navigate(Routes.THEME)
                         "orders" -> navController.navigate(Routes.MY_ORDERS)
                         "saved-products" -> navController.navigate(Routes.SAVED_PRODUCTS)
                         "saved-sellers" -> navController.navigate(Routes.SAVED_SELLERS)
@@ -720,6 +721,7 @@ fun AppNavigation() {
         composable(Routes.PAYMENT_METHODS) { PaymentMethodsScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.NOTIFICATION_PREFS) { NotificationSettingsScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.LANGUAGE) { LanguageScreen(onBack = { navController.popBackStack() }) }
+        composable(Routes.THEME) { ThemeScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.CURRENCY) { CurrencyScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.MY_ORDERS) {
             MyOrdersScreen(
@@ -753,6 +755,13 @@ fun AppNavigation() {
         composable(Routes.REPORT) { ReportProblemScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.ABOUT) { CmsScreen(slug = "about", title = "About ScottsTechX", onBack = { navController.popBackStack() }) }
         composable(Routes.AUDIT) { AuditScreen(onBack = { navController.popBackStack() }) }
+        composable(
+            Routes.CMS,
+            arguments = listOf(navArgument("slug") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val slug = backStackEntry.arguments?.getString("slug") ?: "about"
+            CmsScreen(slug = slug, onBack = { navController.popBackStack() })
+        }
         composable(Routes.DELETE_ACCOUNT) { DeleteAccountScreen(onBack = { navController.popBackStack() }, onConfirm = { navController.popBackStack() }) }
         composable(Routes.PRIVACY) { CmsScreen(slug = "privacy", title = "Privacy Policy", onBack = { navController.popBackStack() }) }
         composable(

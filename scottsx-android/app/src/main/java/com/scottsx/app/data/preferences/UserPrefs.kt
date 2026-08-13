@@ -14,6 +14,10 @@ class UserPrefs private constructor(private val sp: SharedPreferences) {
     fun getPrivacyShowTransactions(): Boolean = sp.getBoolean("priv_trans", true)
     fun setPrivacyShowTransactions(v: Boolean) { sp.edit().putBoolean("priv_trans", v).apply() }
 
+    // Theme mode: "system" | "light" | "dark"
+    fun themeMode(): String = sp.getString("theme_mode", "system") ?: "system"
+    fun setThemeMode(mode: String) { sp.edit().putString("theme_mode", mode).apply() }
+
     companion object {
         @Volatile private var instance: UserPrefs? = null
         fun get(context: Context): UserPrefs = instance ?: synchronized(this) {
