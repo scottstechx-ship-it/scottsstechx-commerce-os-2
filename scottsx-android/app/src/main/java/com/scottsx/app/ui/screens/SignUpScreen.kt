@@ -241,10 +241,23 @@ fun SignUpScreen(
                         androidx.compose.material3.OutlinedButton(
                             onClick = {
                                 verifyingEmail = true
-                                // Simulate code generation. The real backend
-                                // would POST /api/v1/auth/send-code and email it.
-                                generatedCode = (100000 + (System.currentTimeMillis() % 899999)).toString()
-                                verifyingEmail = false
+                                // Real Firebase email verification.
+                                // Firebase sends an actual email via its
+                                // configured SMTP provider; the user clicks
+                                // the link in the email and the app refreshes
+                                // the emailVerified flag on next session.
+                                com.google.firebase.auth.FirebaseAuth.getInstance()
+                                    .currentUser
+                                    ?.sendEmailVerification()
+                                    ?.addOnCompleteListener { task ->
+                                        verifyingEmail = false
+                                        if (task.isSuccessful) {
+                                            generatedCode = "EMAIL_SENT"
+                                            errorMsg = "Verification email sent. Tap the link in it to verify."
+                                        } else {
+                                            errorMsg = "Failed to send: ${task.exception?.message ?: "unknown"}"
+                                        }
+                                    }
                             },
                             modifier = Modifier.weight(1f),
                         ) {
@@ -261,18 +274,26 @@ fun SignUpScreen(
                             keyboardType = KeyboardType.Number,
                         )
                         Spacer(modifier = Modifier.height(6.dp))
+                        // "I've clicked the link" button — re-checks
+                        // Firebase's emailVerified flag on the current user.
                         androidx.compose.material3.Button(
                             onClick = {
-                                emailVerified = verificationCode == generatedCode
-                                if (!emailVerified) errorMsg = "Incorrect code — check your email."
+                                val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+                                user?.reload()?.addOnCompleteListener { _ ->
+                                    emailVerified = user?.isEmailVerified == true
+                                    if (emailVerified) {
+                                        errorMsg = null
+                                    } else {
+                                        errorMsg = "Email not yet verified. Click the link in the email and try again."
+                                    }
+                                }
                             },
                             modifier = Modifier.fillMaxWidth(),
                             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = if (emailVerified) ScottsTechXColors.BluePrimary else ScottsTechXColors.BluePrimaryLight
+                                containerColor = ScottsTechXColors.BluePrimary
                             ),
-                            enabled = verificationCode.length == 6,
                         ) {
-                            Text(if (emailVerified) "Email verified" else "Verify code")
+                            Text("I've verified — continue")
                         }
                     }
                 } else if (emailVerified) {

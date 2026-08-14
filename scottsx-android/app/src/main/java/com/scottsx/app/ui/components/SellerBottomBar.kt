@@ -84,21 +84,49 @@ fun SellerBottomBar(
                 )
                 .padding(horizontal = 8.dp),
         ) {
+            // 4 nav items split into 2 groups (left of FAB / right of FAB)
+            // so the layout is balanced: Home | AI  [FAB]  Messages | Analytics
+            // Each side has equal weight to the right and left, so the FAB
+            // is visually centered and the buttons don't crowd it.
             Row(
                 modifier = Modifier.fillMaxWidth().height(64.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SellerBottomTab.values().forEach { tab ->
-                    if (tab == SellerBottomTab.Add) {
-                        Spacer(Modifier.width(56.dp)) // reserve space for the FAB
-                    } else {
-                        SellerNavItem(
-                            tab = tab,
-                            selected = tab == selected,
-                            onClick = { onSelect(tab) },
-                        )
-                    }
+                // Left half: Home + AI
+                Row(
+                    modifier = Modifier.weight(1f).fillMaxWidth().height(64.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SellerNavItem(
+                        tab = SellerBottomTab.Home,
+                        selected = selected == SellerBottomTab.Home,
+                        onClick = { onSelect(SellerBottomTab.Home) },
+                    )
+                    SellerNavItem(
+                        tab = SellerBottomTab.AI,
+                        selected = selected == SellerBottomTab.AI,
+                        onClick = { onSelect(SellerBottomTab.AI) },
+                    )
+                }
+                // Center FAB spacer (same width as the Add button)
+                Spacer(Modifier.width(72.dp))
+                // Right half: Messages + Analytics
+                Row(
+                    modifier = Modifier.weight(1f).fillMaxWidth().height(64.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SellerNavItem(
+                        tab = SellerBottomTab.Messages,
+                        selected = selected == SellerBottomTab.Messages,
+                        onClick = { onSelect(SellerBottomTab.Messages) },
+                    )
+                    SellerNavItem(
+                        tab = SellerBottomTab.Analytics,
+                        selected = selected == SellerBottomTab.Analytics,
+                        onClick = { onSelect(SellerBottomTab.Analytics) },
+                    )
                 }
             }
         }
