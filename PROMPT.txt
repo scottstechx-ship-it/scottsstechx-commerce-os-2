@@ -1,0 +1,558 @@
+================================================================
+  ScottsTechX — Complete Build Prompt & Architecture Guide
+  Owner: Kato Fred (Ugandan cybersecurity analyst, web dev, software dev)
+  Date: 2026-08-14
+================================================================
+
+This document is the master prompt describing how the entire ScottsTechX
+app was built from scratch — both the Fastify backend and the Android
+Compose frontend. Use it as the single source of truth for onboarding
+new developers, regenerating the app, or auditing the work.
+
+
+================================================================
+1. PROJECT OVERVIEW
+================================================================
+
+ScottsTechX is a Ugandan e-commerce marketplace that runs on:
+
+  - Android app (Kotlin + Jetpack Compose, min SDK 30, target SDK 35)
+  - Fastify backend (Node.js + TypeScript) on port 3001
+  - Embedded PostgreSQL on port 5433 (embedded-postgres package)
+  - Firebase Authentication (real email-link verification)
+  - OpenRouter LLM (meta-llama/llama-3.3-70b-instruct) for AI
+  - Coil 2.x for image loading
+  - Naver/Navigation-Compose for routing
+
+The app has two roles: BUYER and SELLER. Each role gets its own
+bottom navigation bar, its own AI assistant screen, its own dashboard,
+its own settings panel, and its own messaging inbox.
+
+The founder's biography is seeded into the CMS table:
+  "Kato Fred, Ugandan cybersecurity analyst, web dev and software dev."
+
+
+================================================================
+2. HOW THE TWO HALVES TALK
+================================================================
+
+Android app --> http://127.0.0.1:3001/api/v1/...
+Backend     --> PostgreSQL on 127.0.0.1:5433
+
+The single API entry point is defined in
+scottsx-android/app/src/main/java/com/scottsx/app/data/remote/V2Client.kt.
+Every network call goes through one of the suspend functions in that
+file. They share one OkHttpClient and a single bearer-token from
+SessionCache.
+
+Auth flow:
+  1. User signs up via Firebase Auth.
+  2. FirebaseAuth.signInWithEmailAndPassword returns an idToken.
+  3. App POSTs that idToken to /api/v1/auth/firebase/sign-in.
+  4. Backend verifies the token, mints its own JWT (24h),
+     and stores the user row in Postgres.
+  5. All subsequent requests send `Authorization: Bearer <jwt>`.
+
+
+================================================================
+3. REPOSITORY LAYOUT
+================================================================
+
+E:/ScottsTechX life projects/ScottsTechX/
++-- scottsx-android/                     <- Android app (Gradle)
+|   +-- app/src/main/java/com/scottsx/app/
+|   |   +-- MainActivity.kt              <- Entry point
+|   |   +-- ScottsTechXApp.kt            <- Coil + Firebase init
+|   |   +-- ai/ScottsTechAi.kt           <- Shared AI helper
+|   |   +-- ai/AiTools.kt                <- Tool calling layer
+|   |   +-- ai/AiPersonalizationStore.kt
+|   |   +-- data/
+|   |   |   +-- MarketplaceDataSource.kt <- Local fallback data
+|   |   |   +-- domain/
+|   |   |   |   +-- MarketplaceModels.kt <- Product, Message, etc
+|   |   |   +-- remote/
+|   |   |   |   +-- V2Client.kt          <- ALL API calls
+|   |   |   |   +-- MessageStream.kt
+|   |   |   +-- firebase/
+|   |   |   |   +-- FirebaseAuthRepository.kt
+|   |   |   |   +-- FirebaseBridge.kt
+|   |   |   +-- GoogleSignInHelper.kt
+|   |   +-- ui/
+|   |   |   +-- theme/ScottsTechXColors.kt
+|   |   |   +-- components/             <- Reusable Compose widgets
+|   |   |   |   +-- SellerBottomBar.kt  <- 2-half layout
+|   |   |   |   +-- ProductCard.kt      <- Real Unsplash images
+|   |   |   |   +-- ProductImage.kt     <- Global Coil loader
+|   |   |   |   +-- InputField.kt       <- Dark text defaults
+|   |   |   |   +-- SettingsRow.kt
+|   |   |   +-- screens/                <- ~30 Compose screens
+|   |   |   |   +-- BuyerHomeScreen.kt
+|   |   |   |   +-- SellerHomeScreen.kt
+|   |   |   |   +-- AiAssistantScreen.kt (buyer AI - legacy)
+|   |   |   |   +-- RealAiChatScreen.kt (buyer AI - current)
+|   |   |   |   +-- SellerAIAssistantScreen.kt (NEW)
+|   |   |   |   +-- MessagesScreen.kt
+|   |   |   |   +-- SellerMessagesScreen.kt
+|   |   |   |   +-- MessageThreadScreen.kt (enterprise features)
+|   |   |   |   +-- NearbyScreen.kt (filter/sort/radius)
+|   |   |   |   +-- ProfileScreen.kt (22 settings wired)
+|   |   |   |   +-- ProfileSettingsScreen.kt (seller)
+|   |   |   |   +-- StoreSettingsDetailScreen.kt (NEW)
+|   |   |   |   +-- SettingsSubScreens.kt
+|   |   |   |   +-- AddProductScreen.kt (AI suggest from photo)
+|   |   |   |   +-- SignUpScreen.kt (Firebase email link)
+|   |   |   |   +-- LoginScreen.kt
+|   |   |   |   +-- OrdersScreen.kt
+|   |   |   |   +-- ProductDetailScreen.kt
+|   |   |   |   +-- AccountSettingsScreen.kt
+|   |   |   |   +-- AddressesScreen.kt
+|   |   |   |   +-- PaymentMethodsScreen.kt
+|   |   |   |   +-- SavedProductsScreen.kt
+|   |   |   |   +-- RefundsScreen.kt
+|   |   |   |   +-- SupportScreen.kt
+|   |   |   |   +-- ThemeScreen.kt (NEW)
+|   |   |   |   +-- CmsScreen.kt (Terms, Privacy, etc)
+|   |   |   |   +-- NotificationsScreen.kt
+|   |   |   |   +-- BecomeSellerScreen.kt
+|   |   +-- navigation/AppNavigation.kt <- 30+ routes
+|   |   +-- res/xml/network_security_config.xml
+|   +-- build.gradle.kts (kotlin DSL)
+|   +-- android-toolchain/jdk17/         <- JDK 17.0.19
+
++-- 12_Backend/                         <- Fastify backend
+    +-- src/
+    |   +-- server.ts                    <- bootstrap + route registration
+    |   +-- db.ts                        <- pg pool
+    |   +-- auth.ts                      <- JWT + bcrypt helpers
+    |   +-- firebase/admin.ts            <- firebase-admin init
+    |   +-- modules/
+    |   |   +-- auth/
+    |   |   |   +-- login.route.ts
+    |   |   |   +-- firebase-auth.route.ts (send-verification-email)
+    |   |   |   +-- google.route.ts
+    |   |   +-- products/
+    |   |   |   +-- products.route.ts
+    |   |   |   +-- products.service.ts
+    |   |   +-- seller/
+    |   |   |   +-- store-settings.route.ts
+    |   |   +-- user/
+    |   |   |   +-- user-full.route.ts   <- 30+ endpoints
+    |   |   +-- ai/
+    |   |   |   +-- assistant.route.ts
+    |   |   |   +-- assistant.service.ts
+    |   |   +-- chat/
+    |   |   |   +-- chat.route.ts
+    |   +-- migrations/                  <- 24 SQL files
+    |   +-- seed_marketplace.mjs         <- 6 sellers + 24 products
+    +-- secrets/firebase-admin-key.json  <- service account
+    +-- .env                             <- dev config
+    +-- package.json
+    +-- tsconfig.json
+
+
+================================================================
+4. BUILD STEPS — START FROM ZERO
+================================================================
+
+4.1. Backend first
+----------------------------------------------------------------
+
+  cd "E:\ScottsTechX life projects\ScottsTechX\12_Backend"
+  npm install
+  npm run build            # compiles TypeScript -> dist/
+  npm run dev              # starts embedded PG on 5433 + Fastify on 3001
+
+  # When the server boots it runs all migrations in /migrations in order.
+  # Then run the seed:
+  node seed_marketplace.mjs
+
+  # Smoke-test:
+  curl http://127.0.0.1:3001/healthz
+  curl http://127.0.0.1:3001/api/v1/products   # 24 items, each with imageUrl
+
+4.2. Android app
+----------------------------------------------------------------
+
+  # Prereqs: JDK 17.0.19 at android-toolchain\jdk17\jdk-17.0.19+10
+  cd "E:\ScottsTechX life projects\ScottsTechX\scottsx-android"
+  set JAVA_HOME=E:\ScottsTechX life projects\ScottsTechX\android-toolchain\jdk17\jdk-17.0.19+10
+  set PATH=%JAVA_HOME%\bin;%PATH%
+  gradlew --no-daemon --offline :app:assembleDebug
+
+  # APK lands at app/build/outputs/apk/debug/app-debug.apk
+
+4.3. Install on device
+----------------------------------------------------------------
+
+  adb -s <serial> install -r app-debug.apk
+  adb -s <serial> shell wm dismiss-keyguard
+  adb -s <serial> shell am start -n com.scottsx.app/com.scottsx.app.MainActivity
+
+
+================================================================
+5. BACKEND API SURFACE
+================================================================
+
+Auth
+  POST   /api/v1/auth/register             local bcrypt signup (legacy)
+  POST   /api/v1/auth/login                local bcrypt login
+  POST   /api/v1/auth/firebase/sign-in     exchange Firebase idToken -> JWT
+  POST   /api/v1/auth/firebase/send-verification-email
+         ^-- generates Firebase email-link, sends via Firebase SMTP
+  POST   /api/v1/auth/firebase/upgrade-to-seller
+  GET    /api/v1/auth/firebase/me          current user profile
+  GET    /api/v1/auth/me
+  PATCH  /api/v1/auth/me                   update profile
+
+Products
+  GET    /api/v1/products                  list 24 seeded items
+  GET    /api/v1/products/:id
+  POST   /api/v1/seller/products           create listing
+  GET    /api/v1/seller/products
+  DELETE /api/v1/seller/products/:id
+
+Sellers
+  GET    /api/v1/sellers/nearby            ?lat=&lng=&radiusKm=
+  GET    /api/v1/sellers/:id
+  GET    /api/v1/seller/profile
+  GET    /api/v1/seller/store-settings
+  PATCH  /api/v1/seller/store-settings     9 sections (store-profile,
+                                            business-info, store-location,
+                                            delivery, payments,
+                                            notifications, security,
+                                            policies, help)
+  GET    /api/v1/seller/dashboard/stats    revenue, orders, low-stock
+
+User / settings (the BIG user-full.route.ts)
+  /api/v1/me/addresses            CRUD
+  /api/v1/me/payment-methods     CRUD
+  /api/v1/me/bookmarks           GET
+  /api/v1/me/orders              GET, GET/:id
+  /api/v1/me/refunds             POST, GET
+  /api/v1/me/support/tickets     POST, GET
+  /api/v1/me/faqs                GET
+  /api/v1/me/notifications       GET, PATCH /:id/read
+  /api/v1/me/preferences         GET, PATCH (theme, language, currency)
+  /api/v1/me/locations           GET, POST, DELETE
+  /api/v1/me/change-password     POST
+
+AI
+  POST   /api/v1/ai/v2/ask                 OpenRouter Llama-3.3-70B
+                                            context = user's full catalog
+  POST   /api/v1/ai/v2/generate-product    title/desc/category from photo
+
+CMS
+  GET    /api/v1/cms/:slug                 terms | privacy | buyer-protection |
+                                            about  (returns Kato Fred bio)
+
+Chat / messaging
+  GET    /api/v1/conversations             inbox
+  GET    /api/v1/conversations/:id/messages
+  POST   /api/v1/conversations/:id/messages
+  POST   /api/v1/conversations/:id/read    mark read receipts
+
+Stripe (skeleton - keys empty in .env)
+  POST   /api/v1/orders/:orderId/pay
+  POST   /api/v1/stripe/webhook
+
+
+================================================================
+6. ANDROID ARCHITECTURE
+================================================================
+
+6.1. Single source of network truth
+----------------------------------------------------------------
+V2Client.kt owns every endpoint. It exposes typed suspend functions:
+
+    suspend fun fetchProductsList(): List<Product>
+    suspend fun ask(prompt: String, screen: String): AiReply?
+    suspend fun fetchStoreSettings(): StoreSettings
+    suspend fun updateStoreSettings(s: StoreSettings)
+    suspend fun fetchUserSettings(): Settings
+    suspend fun saveSettings(s: Settings)
+    suspend fun updateUserProfile(...)
+    suspend fun updateSellerProfile(...)
+    suspend fun fetchSellerProfile(): SellerProfile
+    suspend fun fetchConversations(): List<Conversation>
+    suspend fun fetchMessages(conversationId: String): List<V2Client.Message>
+    suspend fun sendMessage(conversationId: String, text: String)
+    suspend fun markRead(conversationId: String)
+    suspend fun nearbySellers(lat: Double, lng: Double): List<NearbySeller>
+
+All return either the typed model, a sealed class result, or null.
+No raw JSON escapes past this file.
+
+6.2. Two AI assistants
+----------------------------------------------------------------
+
+BUYER AI — RealAiChatScreen.kt
+  - Top bar with title and gradient
+  - Quick-reply chips (HorizontalPager): "What's near me?",
+    "Cheapest Samsung A55", "Summarize my transactions", etc.
+  - LazyColumn chat log
+  - Composer with send button + back nav
+  - BEFORE calling V2Client.ask, it fetches the full catalog
+    (first 40 products) and prepends a textual summary:
+
+      "Live marketplace catalog (24 products):
+       - iPhone 15 Pro 256GB Natural Titanium (Electronics)
+         UGX 4500000 from Tech Hub Uganda [id=...]
+       ..."
+
+    so the LLM can answer store-specific questions accurately.
+
+SELLER AI — SellerAIAssistantScreen.kt (NEW)
+  - Gradient header (blue -> purple -> pink)
+  - 4 quick tools in a 2x2 grid:
+      Sales analytics    (weekly revenue, orders, top sellers)
+      Low stock          (refill alerts, demand signals)
+      Pricing tips       (competitor comparison, margin lift)
+      Marketing ideas    (campaigns, promos, retention)
+  - Chat area below the tools
+  - Each tool adds a user + ai message to the chat
+  - The user can also type freeform questions; same backend
+
+6.3. Enterprise messaging (MessageThreadScreen.kt)
+----------------------------------------------------------------
+  - Bubble layout: rounded corners with 4dp tail on sender's side
+  - Read receipts: sender messages show "✓ Delivered" or
+    "✓✓ Read" (blue when read)
+  - Typing indicator bubble appears above the composer
+  - Composer has:
+      [+] [type-area] [⭐ quick] [Send]
+    "+" opens an attach menu (image / file picker - stub)
+    "⭐" toggles a row of preset replies ("Got it", "On the way",
+       "Thanks!", "Will check")
+    Send button is disabled+greyed when input empty
+
+6.4. NearbyScreen.kt — advanced UI
+----------------------------------------------------------------
+  - Top: LocationStatusCard (gradient blue) with 6 Uganda cities
+    (Kampala, Entebbe, Jinja, Mbarara, Gulu, Mbale) as chips
+  - New FilterSortBar:
+      Horizontal scrolling category chips
+      Sort pill (cycles Nearest / Top rated / Most products)
+      Verified-only toggle pill
+      Radius slider (1-100 km)
+  - List filtered + sorted client-side via Kotlin sequences
+  - Result count shows "{N} sellers"
+
+6.5. AddProductScreen.kt — AI suggest from photo
+----------------------------------------------------------------
+  - Step 0 (Basics): name + description + category
+  - Below the description: "✨ AI suggest from photo" button
+  - When seller has added at least one image URL, the button is enabled
+  - Tapping it runs a heuristic generator:
+      Looks at the URL for keywords ("phone", "iphone", "samsung",
+      "shoe", "nike", "dress", "ankara", "kitenge", "rice",
+      "headphone", "lipstick", "makeup", "watch")
+      Maps to:
+        Title       ("Premium Smartphone — Like New")
+        Description (full sentence with delivery/trust info)
+        Category    (Electronics / Sports / Fashion / Beauty / Groceries)
+  - Preview shows the suggestion with "Apply" or "Dismiss"
+  - Real backend wiring exists at /api/v1/ai/v2/generate-product
+    (currently heuristic only — easy swap)
+
+6.6. SignUpScreen.kt — Firebase real email-link verification
+----------------------------------------------------------------
+  Flow:
+    1. User enters email
+    2. Tap "Send verification email"
+    3. App calls FirebaseAuth.getInstance().currentUser
+        ?.sendEmailVerification()
+       Firebase sends an actual email to that address
+    4. App shows "Verification email sent" + "I've verified — continue"
+    5. User taps the link in their email
+    6. They come back to the app, tap "I've verified — continue"
+    7. App calls user.reload() and checks isEmailVerified
+    8. If true, signup proceeds; if false, retry message
+
+  The backend has a parallel endpoint
+  POST /api/v1/auth/firebase/send-verification-email that uses
+  Firebase Admin SDK's generateEmailVerificationLink.
+
+6.7. SellerBottomBar.kt — balanced spacing (v0.22.1 fix)
+----------------------------------------------------------------
+  Layout: weighted Row split into left half + center spacer +
+  right half:
+      [Home | AI]    [Add FAB]    [Messages | Analytics]
+
+  - Left half is a Row with SpaceEvenly for Home and AI
+  - Right half is a Row with SpaceEvenly for Messages and Analytics
+  - Center Spacer reserves 72dp for the FAB (which is
+    64dp + 14dp offset above the bar)
+  - Each side has equal weight(1f) so the FAB is visually centered
+    and the AI button is no longer crowded next to it
+
+
+================================================================
+7. KEY FILE-TO-FILE CONTRACTS
+================================================================
+
+scottsx-android ... ui/components/ProductImage.kt
+  fun ProductImage(
+      imageKey: String,
+      categoryLabel: String,
+      imageUrl: String? = null,
+      modifier: Modifier = Modifier,
+  )
+  - AsyncImage with model = imageUrl
+  - Fallback gradient placeholder + category letter
+  - Uses Coil.imageLoader(ctx) so it shares the global loader
+
+scottsx-android ... data/remote/V2Client.kt
+  - All API endpoints
+  - Bearer token from SessionCache
+
+scottsx-android ... ui/screens/SellerAIAssistantScreen.kt
+  fun SellerAIAssistantScreen(onBack: () -> Unit)
+  - Self-contained, no params needed beyond back navigation
+
+scottsx-android ... ui/screens/StoreSettingsDetailScreen.kt
+  fun StoreSettingsDetailScreen(
+      section: String,
+      onBack: () -> Unit,
+  )
+  - section is the slug ("store-profile", "delivery", "policies"...)
+  - Internally routes to one of 9 forms
+
+12_Backend/src/server.ts
+  registerStoreSettingsRoute(app)
+  registerUserFullRoute(app)
+  registerFirebaseAuthRoute(app)
+  registerProductsRoute(app)
+  registerSellerRoute(app)
+  registerAiRoute(app)
+
+
+================================================================
+8. DATABASE SCHEMA (essentials)
+================================================================
+
+users
+  id, email, password_hash, role(buyer|seller), display_name,
+  phone, email_verified, firebase_uid, profile_photo_url, created_at
+
+products
+  id, seller_id, title, description, category, brand, price_minor,
+  old_price_minor, stock_quantity, image_url, rating, rating_count,
+  is_flash_deal, discount_percent, location, created_at
+
+product_media
+  id, product_id, url, sort_order
+
+sellers (table) / users where role=seller
+  store_name, store_logo, lat, lng, city, address, verified, rating
+
+conversations
+  id, buyer_id, seller_id, product_id, last_message, last_time
+
+messages
+  id, conversation_id, sender_id, text, image_url, created_at
+
+message_reads
+  conversation_id, user_id, last_read_at
+
+addresses / payment_methods / bookmarks / refund_claims
+  ^-- created in migration 0024_user_settings_full.sql
+
+cms_pages
+  slug, title, body, updated_at
+  ^-- contains Kato Fred bio seeded as 'about'
+
+
+================================================================
+9. CONVENTIONS
+================================================================
+
+Code style
+  - Kotlin: tabs for indentation, no wildcard imports, 4-space continuation
+  - Compose: remember + collectAsState for state, rememberCoroutineScope
+    for launch effects, no business logic in composables
+
+Naming
+  - Composables: PascalCase, screens end in "Screen"
+  - Functions: camelCase
+  - Routes: kebab-case strings ("seller/store-settings/policies")
+  - Files: match the primary type they contain
+
+State management
+  - SessionCache (single source of truth for the current user)
+  - UserPrefs for non-secret persisted prefs (theme, language)
+  - Each screen has its own remember{} mutableStateOf for ephemeral UI
+
+Backend
+  - Zod for input validation (z.object({...}).parse(request.body))
+  - Errors thrown with custom classes (UnauthorizedError, etc)
+  - JWT signed with HS256, 24h expiry
+  - All routes under /api/v1/
+
+Testing
+  - Manual end-to-end on the physical device (Tecno 042532598N000481)
+  - Backend smoke-test via curl /healthz and /api/v1/products
+  - uiautomator dump used for screen text introspection
+
+
+================================================================
+10. KNOWN GOTCHAS
+================================================================
+
+- Unsplash images load only if:
+    (a) The imageUrl is a real URL, NOT a placeholder like "phone"
+    (b) The ProductImage composable uses Coil.imageLoader(ctx)
+        (NOT ImageLoader.Builder(ctx).build())
+    (c) The phone has internet (test with adb shell ping 8.8.8.8)
+
+- The buyer home shows live API data; when the API is empty
+  it falls back to MarketplaceDataSource.products.
+
+- Signup email verification uses the Firebase email LINK model,
+  not a 6-digit code. The "I've verified — continue" button
+  re-fetches isEmailVerified.
+
+- The 6-city location selector shows real Ugandan cities from
+  the seed script. Tapping a chip selects the city and triggers
+  a /api/v1/sellers/nearby call.
+
+- Embedded-postgres binary on Windows: `npm install` may need
+  `--force` to copy the right .node binary. See windows-npm-install-corruption
+  skill.
+
+- Gradle builds use -Dkotlin.compiler.execution.strategy=in-process
+  to stay under the 4 GB Gradle JVM cap.
+
+
+================================================================
+11. DEPLOYMENT CHECKLIST
+================================================================
+
+Production backend:
+  [ ] Set DATABASE_URL to a managed Postgres (Render / Supabase)
+  [ ] Set STRIPE_SECRET_KEY for live payments
+  [ ] Configure SendGrid if scaling beyond Firebase SMTP
+  [ ] Lock CORS to the production domain
+  [ ] Add HTTPS terminator (Caddy / Nginx / Cloudflare)
+
+Android release:
+  [ ] Switch BuildVariant to "release"
+  [ ] Sign with a release keystore (currently debug)
+  [ ] Update google-services.json with the prod Firebase project
+  [ ] Replace Unsplash demo URLs with seller-uploaded media
+  [ ] Update APP_DEEP_LINK in .env for email verification links
+
+QA:
+  [ ] Run adb shell uiautomator dump on every screen
+  [ ] Capture screenshot on every state (v0.20.6 -> v0.22.1)
+  [ ] Verify the Firebase email verification link works on real device
+
+
+================================================================
+12. CONTACT
+================================================================
+
+Kato Fred — Ugandan cybersecurity analyst, web dev, software dev
+Project: ScottsTechX Commerce OS
+
+================================================================
+EOF
