@@ -1,0 +1,734 @@
+================================================================
+ScottsTechX — FIRST-SCREENS PROMPT
+(From App Launch to Sign-In / Sign-Up Success)
+================================================================
+
+This document explains, screen by screen, what the user sees
+when they first open ScottsTechX, how each screen is built in
+Kotlin + Jetpack Compose, and how the data flows from the
+local UI all the way down to the Fastify backend.
+
+It stops at successful sign-in (or sign-up). Dashboards and
+in-app screens are described in a separate doc.
+
+The app is built in:
+  E:\ScottsTechX life projects\ScottsTechX\ScottsTechX\scottsx-android\
+
+================================================================
+1. RUNTIME WIRING (HOW A LAUNCH BECOMES A SCREEN)
+================================================================
+
+1.1.  AndroidManifest.xml
+----------------------------------------------------------------
+The manifest declares a custom Application class and a single
+launcher Activity:
+
+    <application
+        android:name=".ScottsTechXApp"
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:theme="@style/Theme.ScottsTechX"
+        ... >
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.ScottsTechX.Splash">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+Two themes:
+  - Theme.ScottsTechX.Splash -> shown during cold start so the
+    first frame is the app's gradient + logo (no white flash).
+  - Theme.ScottsTechX        -> the regular Material3 theme used
+    by every Compose screen.
+
+`usesCleartextTraffic="true"` + the network_security_config.xml
+allow plain HTTP to 127.0.0.1 (the local Fastify backend) and
+10.0.2.2 (the emulator's host loopback). Production traffic to
+https://europe-west1-scottstechx-52bab.cloudfunctions.net goes
+over TLS.
+
+1.2.  ScottsTechXApp.kt  (Application class)
+----------------------------------------------------------------
+File: app/src/main/java/com/scottsx/app/ScottsTechXApp.kt
+
+This class boots the app-wide singletons BEFORE any Activity is
+created. Two things happen in onCreate():
+
+    override fun onCreate() {
+        super.onCreate()
+        FirebaseApp.initializeApp(this)         // 1
+    }
+
+    override fun newImageLoader(): ImageLoader { // 2
+        val memBytes = (maxMemory / 4).toInt().coerceAtLeast(16 MB)
+        val diskBytes = 50L * 1024 * 1024         // 50 MB
+        return ImageLoader.Builder(this)
+            .okHttpClient(OkHttpClient.Builder()
+                .connectTimeout(8, SECONDS)
+                .readTimeout(15, SECONDS)
+                .build())
+            .memoryCache { MemoryCache.Builder(this)
+                .maxSizeBytes(memBytes).build() }
+            .diskCache { DiskCache.Builder()
+                .directory(cacheDir.resolve("coil_image_cache"))
+                .maxSizeBytes(diskBytes).build() }
+            .respectCacheHeaders(false)
+            .crossfade(true)
+            .crossfade(120)
+            .build()
+    }
+
+(1) Firebase init — done explicitly (not just via google-services
+plugin) so the first Auth call doesn't race with the first
+Composable. This unlocks FirebaseAuth + email-link verification
+that the Sign-Up screen uses later.
+
+(2) A custom Coil ImageLoader. Coil calls this the first time any
+AsyncImage is rendered, and that single loader is shared by every
+product photo, seller logo, and avatar in the app.
+
+WHY THIS MATTERS: a previous version of the app built a fresh
+ImageLoader.Builder(ctx).build() inside every ProductImage
+composable, which OVERRODE the global loader and silently dropped
+every network request. The fix is to ask Coil for the global loader
+with `Coil.imageLoader(ctx)`. The app's own ScottsTechXApp
+configures timeouts, memory cache (25% of available RAM), and a
+50 MB on-disk cache in a `coil_image_cache/` subdir.
+
+1.3.  MainActivity.kt
+----------------------------------------------------------------
+File: app/src/main/java/com/scottsx/app/MainActivity.kt
+
+The Activity is intentionally tiny — Compose owns everything
+from here on:
+
+    class MainActivity : ComponentActivity() {
+        override fun onCreate(savedInstanceState: Bundle?) {
+            super.onCreate(savedInstanceState)
+            setContent {
+                ScottsTechXTheme {              // 1
+                    Surface(modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.background) {
+                        AppNavigation()          // 2
+                    }
+                }
+            }
+        }
+    }
+
+(1) ScottsTechXTheme reads the user's chosen light/dark/system
+mode from UserPrefs and applies MaterialTheme.colorScheme +
+ScottsTechXColors (our custom palette of blue/purple/pink
+gradients).
+
+(2) AppNavigation() is the single NavHost for the entire app.
+The Welcome screen is the first composable in the graph
+(startDestination = Routes.WELCOME).
+
+The result: tapping the launcher icon shows our splash theme
+for ~50 ms, then the OS replaces it with the Splash Activity
+content, which then hosts the Compose graph at the Welcome
+composable. There is no white-flash because the splash theme
+already has the same background gradient.
+
+
+================================================================
+2. SCREEN #1:  WELCOME  (the very first thing the user sees)
+================================================================
+
+File: app/src/main/java/com/scottsx/app/ui/screens/WelcomeScreen.kt
+Route: Routes.WELCOME ("welcome")
+
+2.1.  What the user sees
+----------------------------------------------------------------
+- A full-screen vertical gradient (blue -> purple -> pink,
+  painted with Brush.verticalGradient using ScottsTechXColors
+  .BluePrimary, .PurpleAccent, .PinkAccent).
+- Centered on the gradient:
+    - A 96 dp circle of Color.White.copy(alpha = 0.15f) holding
+      a "🛍️" shopping-bags emoji at 44 sp.
+    - Title "ScottsTechX" in 34 sp FontWeight.Bold white.
+    - Subtitle: "Uganda's marketplace. Buy from real local
+      sellers with Mobile Money, cash on delivery, and an AI
+      assistant that knows the live catalog." in 90% white.
+- 48 dp gap, then a full-width WHITE rounded Button (14 dp
+  corners, 52 dp height) that says "Create account" — the
+  BLUE on WHITE contrast is the strongest call to action.
+- 12 dp gap, then a full-width OutlinedButton (1 dp white border
+  at 70% opacity) that says "I already have an account".
+- 24 dp gap, then a small line:
+    "🇺🇬 Kampala • Entebbe • Jinja • Mbarara • Gulu • Mbale"
+  in 75% white at 12 sp — a tiny pride-of-place footer.
+- If SessionCache.isLoggedIn() is true (i.e. a user came back
+  with a stored JWT), an extra line under the footer says
+  "Session active — sign in as <displayName>".
+
+2.2.  How it's built
+----------------------------------------------------------------
+A single @Composable function:
+
+    @Composable
+    fun WelcomeScreen(
+        onLogin: () -> Unit,
+        onSignUp: () -> Unit,
+    )
+
+A Box with fillMaxSize + the vertical gradient, containing a
+Column with fillMaxSize, padding 28 dp, horizontalAlignment =
+CenterHorizontally, verticalArrangement = Center.
+
+The two buttons call the two lambdas passed in by the NavHost.
+No state is held inside WelcomeScreen — it is a pure presentational
+screen.
+
+A LaunchedEffect(Unit) checks SessionCache and would auto-forward
+to the role home if a session exists. The actual auto-forward is
+delegated to a higher-level effect in AppNavigation so the route
+graph is the single source of truth for navigation.
+
+2.3.  How WelcomeScreen is reached
+----------------------------------------------------------------
+AppNavigation.kt declares the route as the startDestination:
+
+    NavHost(navController, startDestination = Routes.WELCOME) {
+        composable(Routes.WELCOME) {
+            WelcomeScreen(
+                onLogin = { navController.navigate(Routes.LOGIN) },
+                onSignUp = { navController.navigate(Routes.SIGNUP) },
+            )
+        }
+        ...
+    }
+
+2.4.  Tap targets
+----------------------------------------------------------------
+- "Create account"  -> Routes.SIGNUP ("signup")
+- "I already have an account" -> Routes.LOGIN ("login")
+
+
+================================================================
+3. SCREEN #2:  SIGN-UP  (the form for new users)
+================================================================
+
+File: app/src/main/java/com/scottsx/app/ui/screens/SignUpScreen.kt
+Route: Routes.SIGNUP ("signup")
+
+3.1.  What the user sees
+----------------------------------------------------------------
+A scrollable Column (verticalScroll(rememberScrollState())) with
+20 dp padding all around:
+
+  [<- back chevron]                                 (SettingsRow, empty title)
+  "Create your account"                              26 sp Bold
+  "Real email verification — check your inbox
+   for the link."                                    bodyMedium, muted
+
+  20 dp gap
+
+  InputField  Full name        placeholder: "Kato Fred"
+  12 dp gap
+  InputField  Email            placeholder: "you@example.com"
+  12 dp gap
+  InputField  Phone (optional) placeholder: "+256 7xx xxx xxx"
+  12 dp gap
+  InputField  Password         (isPassword = true)  min 8 chars
+  12 dp gap
+  InputField  Confirm password (isPassword = true)
+
+  --- Email verification block (only when email matches the
+      android.util.Patterns.EMAIL_ADDRESS regex) ---
+
+  if !emailSent:
+     OutlinedButton "Send verification email"
+        full width
+
+  if emailSent && !verified:
+     InputField "Verification code" KeyboardType.Number
+     Button "I've verified — continue" (full width,
+       enabled when user has tapped it)
+
+  if verified:
+     Text "✅ Email verified" in BluePrimary
+
+  --- Bottom ---
+
+  Red error text (if any)
+  PrimaryButton  "Create account"  (full width)
+  Text           "Already have an account?  Sign in"  (link)
+
+3.2.  How the form state is held
+----------------------------------------------------------------
+Every field is a separate `var` backed by `mutableStateOf("")`,
+declared inside the composable:
+
+    var name by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+
+Plus the verification flow state:
+
+    var emailSent by remember { mutableStateOf(false) }
+    var verified by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var info by remember { mutableStateOf<String?>(null) }
+
+A val emailValid is recomputed on every recomposition:
+    val emailValid = Patterns.EMAIL_ADDRESS.matcher(email).matches()
+
+`val scope = rememberCoroutineScope()` is used to launch the
+network call from inside a button's onClick (the call to
+V2Client.register is suspend, so it must run in a coroutine).
+
+3.3.  The email verification flow
+----------------------------------------------------------------
+This is the only piece of stateful logic in the screen:
+
+  1. User types a valid email.
+  2. The "Send verification email" button appears.
+  3. User taps it. The button's onClick:
+
+        FirebaseAuth.getInstance().currentUser
+            ?.sendEmailVerification()
+            ?.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    emailSent = true
+                    info = "Verification email sent. Tap the
+                            link in it to verify."
+                } else {
+                    error = "Failed to send: ${task.exception?.message}"
+                }
+            }
+
+     Behind the scenes, the Firebase SDK talks to Firebase
+     Auth, which in turn sends a real email to the user. The
+     user must open the link in that email.
+
+  4. User opens the email and taps the link. The link in
+     production points to APP_DEEP_LINK in the backend
+     .env (e.g. https://scottstechx.app/verify); the app
+     handles that deep link out of scope for this doc.
+
+  5. User returns to the app and taps "I've verified —
+     continue". That button does:
+
+        val user = FirebaseAuth.getInstance().currentUser
+        user.reload().addOnCompleteListener {
+            verified = user.isEmailVerified
+            if (!verified) error = "Email not yet verified..."
+        }
+
+     verified is the local flag that gates the "Create account"
+     button.
+
+3.4.  Local validation
+----------------------------------------------------------------
+A small private helper at the bottom of the file:
+
+    private fun isValidEmail(s: String): Boolean =
+        Patterns.EMAIL_ADDRESS.matcher(s).matches()
+
+The "Create account" button is also blocked if:
+  - name is blank
+  - email doesn't match
+  - phone (when provided) doesn't start with +
+  - password < 8 chars
+  - confirm != password
+  - verified == false
+
+Each guard sets the error string and returns out of the button's
+onClick before any network call is made.
+
+3.5.  The actual sign-up network call
+----------------------------------------------------------------
+When all checks pass, inside `scope.launch { ... }`:
+
+    val result = runCatching {
+        authRepository.signUp(
+            email = trimmedEmail,
+            password = password,
+            displayName = trimmedName,
+            phone = trimmedPhone,
+            role = role,
+            sellerExtras = sellerExtras,  // null for buyers
+        )
+    }.getOrElse { AuthResult.Failure(it.message ?: "Sign-up failed") }
+
+    when (result) {
+        is AuthResult.Success -> {
+            // Save JWT + user into SessionCache, then navigate
+            SessionCache.save(
+                result.token,
+                CurrentUser(
+                    id = result.user.id,
+                    email = result.user.email,
+                    displayName = result.user.displayName,
+                    ...
+                ),
+            )
+            onLoggedIn(result.role)   // <-- exits this screen
+        }
+        is AuthResult.Failure -> error = result.message
+        is AuthResult.RoleMismatch -> {
+            // The email is already registered with a different role.
+            // Show "This email is already registered as a SELLER..."
+            // and call onRoleMismatch(result.actual) so the parent
+            // can route the user to the correct dashboard.
+        }
+    }
+
+`authRepository` is the FirebaseAuthRepository. Its signUp()
+method:
+  1. Calls FirebaseAuth.createUserWithEmailAndPassword().
+  2. Catches FirebaseAuthUserCollisionException -> returns
+     AuthResult.RoleMismatch so the UI can show a helpful message.
+  3. On success, POSTs to the backend's
+     /api/v1/auth/firebase/sign-in (NOT the local /auth/register)
+     which returns our 24h HS256 JWT and the user row.
+  4. Mirrors the user to our Postgres `users` table by upserting
+     on firebase_uid.
+
+3.6.  Success path
+----------------------------------------------------------------
+onLoggedIn(result.role) is a lambda passed in by AppNavigation:
+
+    composable(Routes.SIGNUP) {
+        SignUpScreen(
+            onBack = { navController.popBackStack() },
+            onLoggedIn = { role ->
+                val target = when (role?.uppercase()) {
+                    "SELLER" -> Routes.SELLER_HOME
+                    else     -> Routes.BUYER_HOME
+                }
+                navController.navigate(target) {
+                    popUpTo(Routes.WELCOME) { inclusive = false }
+                    launchSingleTop = true
+                }
+            },
+        )
+    }
+
+The popUpTo(Routes.WELCOME) is critical: it means the user
+CANNOT press the system back button and accidentally land back
+on the Welcome screen after signing in. The back stack is
+trimmed to "Welcome -> (just the role home)".
+
+3.7.  Tap targets
+----------------------------------------------------------------
+- SettingsRow back chevron  -> popBackStack() (back to Welcome)
+- "Send verification email" -> FirebaseAuth.sendEmailVerification()
+- "I've verified — continue" -> reload() + isEmailVerified
+- "Create account"          -> signUp flow
+- "Sign in" link            -> Routes.LOGIN
+
+
+================================================================
+4. SCREEN #3:  LOGIN  (returning users)
+================================================================
+
+File: app/src/main/java/com/scottsx/app/ui/screens/LoginScreen.kt
+Route: Routes.LOGIN ("login")
+
+4.1.  What the user sees
+----------------------------------------------------------------
+Scrollable Column, 20 dp padding:
+
+  [<- back chevron]                                  SettingsRow
+  "Welcome back"                                     28 sp Bold
+  "Sign in to ScottsTechX"                           bodyMedium muted
+  24 dp gap
+
+  InputField  Email       placeholder: "you@example.com"   KeyboardType.Email
+  14 dp gap
+  InputField  Password    placeholder: "••••••••"          isPassword = true
+  10 dp gap
+
+  if error != null:
+     Text in ErrorRed, 13 sp
+
+  PrimaryButton  "Sign in"   (full width, shows spinner when loading)
+  16 dp gap
+
+  Center-aligned:
+     "New here?  "  bodyMedium
+     "Create an account"  BluePrimary, SemiBold  -> onGoSignUp()
+  12 dp gap
+     StatusChip "demo: buyer1@example.com / secret123"
+
+4.2.  State and network call
+----------------------------------------------------------------
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    PrimaryButton(
+        text = "Sign in",
+        loading = loading,
+        onClick = {
+            loading = true
+            error = null
+            scope.launch {
+                val result = V2Client.login(email.trim(), password)
+                if (result != null && result.token.isNotBlank()) {
+                    SessionCache.save(result.token, CurrentUser(...))
+                    onLoggedIn(result.user.role)
+                } else {
+                    error = "Invalid email or password"
+                }
+                loading = false
+            }
+        },
+    )
+
+`V2Client.login(email, password)` POSTs
+`{ email, password }` to the Fastify backend at
+`http://127.0.0.1:3001/api/v1/auth/login` and returns
+`{ token, user }` or null on a non-2xx.
+
+The backend's `auth/login.route.ts`:
+  1. Validates the body with zod.
+  2. Looks up the user in `users` by email.
+  3. bcrypt.compare(password, password_hash).
+  4. mints a 24h HS256 JWT with `signJwt({ sub, role, email })`.
+  5. Returns `{ token, user: { id, email, displayName,
+     phone, role, emailVerified, profilePhotoUrl, city } }`.
+
+4.3.  SessionCache.save
+----------------------------------------------------------------
+    SessionCache.save(token, user) does two things:
+      1. Stores token in EncryptedSharedPreferences (or
+         a plain SharedPreferences in debug). Key:
+         "kalinabiri_token" (yes the legacy key is reused).
+      2. Updates the in-memory CurrentUser.value so that any
+         currently-rendered composable that reads
+         SessionCache.user.value will recompose with the new
+         user.
+
+After save, the lambda onLoggedIn(role) navigates to either
+the buyer or seller home using the same popUpTo(WELCOME) trick
+from SignUpScreen.
+
+4.4.  Tap targets
+----------------------------------------------------------------
+- SettingsRow back chevron  -> popBackStack() to Welcome
+- "Sign in" PrimaryButton  -> V2Client.login -> onLoggedIn
+- "Create an account" link  -> Routes.SIGNUP
+
+
+================================================================
+5. SESSION CACHE  (the in-memory state for "who am I")
+================================================================
+
+File: app/src/main/java/com/scottsx/app/SessionCache.kt
+(not a screen, but it underpins screens 1, 2, 3, and the
+post-sign-in home screen)
+
+SessionCache is a top-level object — a process-wide singleton —
+that holds:
+
+    data class CurrentUser(
+        val id: String,
+        val email: String,
+        val displayName: String,
+        val phone: String?,
+        val role: String,                 // "BUYER" or "SELLER"
+        val emailVerified: Boolean,
+        val profilePhotoUrl: String?,
+        val city: String?,
+    )
+
+    object SessionCache {
+        val user = mutableStateOf<CurrentUser?>(null)
+        var token: String? = null
+        fun isLoggedIn() = token != null && user.value != null
+        fun save(token: String, user: CurrentUser) { ... }
+        fun clear() { ... }
+    }
+
+The mutableStateOf wrapper means: any composable that reads
+`SessionCache.user.value` is automatically recomposed when the
+user object changes (e.g. on sign-in or sign-out). The Welcome
+screen's "Session active — sign in as <name>" hint, the auto-
+forward on cold start, and the home-screen top bar avatar all
+read from this single source of truth.
+
+
+================================================================
+6. NAVIGATION GRAPH  (how the routes fit together)
+================================================================
+
+File: app/src/main/java/com/scottsx/app/navigation/AppNavigation.kt
+
+The NavHost has its startDestination = Routes.WELCOME and a
+flat list of composable(...) entries for every screen. Only
+the auth-related ones are shown here:
+
+    composable(Routes.WELCOME) {
+        WelcomeScreen(
+            onLogin = { navController.navigate(Routes.LOGIN) },
+            onSignUp = { navController.navigate(Routes.SIGNUP) },
+        )
+    }
+
+    composable(Routes.LOGIN) {
+        LoginScreen(
+            onBack = { navController.popBackStack() },
+            onGoSignUp = { navController.navigate(Routes.SIGNUP) },
+            onLoggedIn = { role ->
+                routeToRoleHome(navController, role)
+            },
+        )
+    }
+
+    composable(Routes.SIGNUP) {
+        SignUpScreen(
+            onBack = { navController.popBackStack() },
+            onLoggedIn = { role -> routeToRoleHome(navController, role) },
+        )
+    }
+
+The `routeToRoleHome` helper chooses SELLER_HOME if the role
+is SELLER (or the user is an admin), otherwise BUYER_HOME.
+It also calls popUpTo(Routes.WELCOME) so the user cannot
+back-button into the auth flow.
+
+A NavHost-level LaunchedEffect watches SessionCache and
+auto-redirects the user to the role home if a valid session
+is already on disk when the app cold-starts — that's how
+"Session active — sign in as <name>" works: Welcome sees the
+session, and the AppNav-level effect actually moves the user
+forward without a button press.
+
+
+================================================================
+7. THEME  (so screens 1-3 look the same)
+================================================================
+
+File: app/src/main/java/com/scottsx/app/ui/theme/
+
+The app defines:
+
+    object ScottsTechXColors {
+        val BluePrimary, BluePrimaryLight, BluePrimaryDark
+        val PurpleAccent, PinkAccent
+        val PanelLight, PanelInputLight
+        val OnLight, OnLightSecondary
+        val SuccessGreen, ErrorRed, WarningAmber
+        ...
+    }
+
+    @Composable
+    fun ScottsTechXTheme(
+        darkTheme: Boolean = isSystemInDarkTheme(),
+        content: @Composable () -> Unit,
+    ) {
+        val colors = if (darkTheme) DarkColorScheme else LightColorScheme
+        MaterialTheme(colorScheme = colors, content = content)
+    }
+
+`darkTheme` reads UserPrefs.themeMode() which is "light" /
+"dark" / "system" — chosen from the ThemeScreen accessed via
+the buyer's settings drawer.
+
+Every screen uses ScottsTechXColors tokens (NOT raw Color
+hex values) so a single edit to the palette propagates
+everywhere. The Welcome screen IS the only place where a
+hard-coded vertical gradient is drawn, because the splash
+is meant to be distinctive and brand-anchored.
+
+
+================================================================
+8. SUMMARY — THE FIRST-SCREENS FLOW
+================================================================
+
+App icon tap
+   |
+   v
+AndroidManifest -> ScottsTechXApp.onCreate()
+   - Firebase init
+   - Coil global ImageLoader
+   |
+   v
+MainActivity -> setContent { ScottsTechXTheme { AppNavigation() } }
+   |
+   v
+AppNavigation (startDestination = WELCOME)
+   |
+   v
+WELCOME (WelcomeScreen.kt)
+   - Vertical gradient bg, big emoji, title, subtitle
+   - "Create account"  --> SIGNUP
+   - "I already have an account" --> LOGIN
+   - If SessionCache.isLoggedIn(), AppNav auto-forwards to role home
+   |
+   v
+SIGNUP (SignUpScreen.kt)  or  LOGIN (LoginScreen.kt)
+   |
+   v
+Form (InputField, role state in remember)
+   |
+   v
+Sign-up:
+   1. Local field validation
+   2. Real Firebase email-link verification
+      (user taps "Send verification email" -> Firebase SDK sends
+       -> user taps "I've verified" -> reload() -> isEmailVerified)
+   3. signUp() -> POST /api/v1/auth/firebase/sign-in -> JWT
+   4. SessionCache.save(token, user)
+   5. onLoggedIn(role) -> navigate(BUYER_HOME or SELLER_HOME)
+      with popUpTo(WELCOME)
+
+Sign-in:
+   1. POST /api/v1/auth/login
+   2. SessionCache.save(token, user)
+   3. onLoggedIn(role) -> navigate role home
+      with popUpTo(WELCOME)
+
+SessionCache is the single source of truth — Welcome and
+the auto-forward both read from it. No screen owns the
+"is the user signed in" answer.
+
+================================================================
+9. WHERE TO ADD A NEW SCREEN IN THIS FLOW
+================================================================
+
+Suppose a new "Phone number verification" screen must appear
+between SIGNUP and BUYER_HOME. The recipe is:
+
+  1. Add `const val PHONE_VERIFY = "phone-verify"` to Routes.
+  2. Write a new PhoneVerifyScreen.kt.
+  3. In AppNavigation.kt, add:
+        composable(Routes.PHONE_VERIFY) {
+            PhoneVerifyScreen(
+                onBack = { navController.popBackStack() },
+                onVerified = {
+                    navController.navigate(Routes.BUYER_HOME) {
+                        popUpTo(Routes.WELCOME) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
+            )
+        }
+  4. In SignUpScreen.kt, change
+        onLoggedIn = { role -> routeToRoleHome(...) }
+     to
+        onLoggedIn = { role -> navController.navigate(
+            "${Routes.PHONE_VERIFY}?role=$role"
+        ) }
+
+The screen's own state (the code-input field, the resend
+timer) follows the same pattern as SignUpScreen:
+`var x by remember { mutableStateOf("") }` plus
+`val scope = rememberCoroutineScope()` for network calls.
+
+================================================================
+EOF
