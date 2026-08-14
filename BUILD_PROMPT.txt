@@ -1,0 +1,880 @@
+================================================================
+ScottsTechX — BUILD INSTRUCTIONS FOR AN AI WITH NO SOURCE CODE
+================================================================
+
+You are building ScottsTechX from scratch: an Android marketplace
+app + Fastify backend for Uganda. The owner is Kato Fred, an
+Ugandan cybersecurity analyst.
+
+The app has two roles: BUYER and SELLER, each with its own bottom
+nav, dashboard, AI assistant, settings, and messaging inbox.
+
+================================================================
+PHASE 1 — DECIDE THE STACK
+================================================================
+
+Pick these technologies. Do not substitute them unless told otherwise.
+
+  ANDROID (frontend)
+    Language       : Kotlin 1.9+
+    UI             : Jetpack Compose (BOM 2024.06.00+)
+    Min SDK        : 30 (Android 11)
+    Target SDK     : 35 (Android 15)
+    Build tool     : Gradle 8.5 with kotlin DSL
+    JDK            : 17.0.19 (use the exact toolchain)
+    Navigation     : androidx.navigation.compose 2.7.x
+    State          : Compose State + collectAsState + rememberCoroutineScope
+    Image loading  : Coil 2.6.x with a custom ImageLoaderFactory
+    Auth           : Firebase Auth (com.google.firebase:firebase-auth-ktx)
+    HTTP           : OkHttp 4.12 + built-in org.json (NO Retrofit/Moshi)
+    Coroutines     : kotlinx-coroutines-android 1.8.x
+    In-memory DB   : none needed; data lives in V2Client + DataStore
+
+  BACKEND (server)
+    Runtime        : Node.js 20.x
+    Framework      : Fastify 5.x with @fastify/cors
+    Language       : TypeScript 5.x (compile with tsx or tsc)
+    Database       : PostgreSQL via `pg` 8.x
+    Local Postgres : `embedded-postgres` package, port 5433
+    API port       : 3001
+    Auth           : bcrypt 5.x + `jose` for JWT (HS256, 24h expiry)
+    Validation     : zod 4.x
+    Email          : Firebase Admin SDK (firebase-admin 12.x)
+                     uses generateEmailVerificationLink
+    AI             : OpenRouter (https://openrouter.ai)
+                     default model meta-llama/llama-3.3-70b-instruct
+    Payments       : Stripe 17.x (skeleton only for now)
+    Migrations     : raw SQL files run in alphabetical order on boot
+
+  SHARED
+    Version control: git (single repo, branch `fix/embedded-postgres-linux-build`)
+    Env file       : 12_Backend/.env (PORT=3001, JWT_SECRET=..., LLM_API_KEY=...,
+                     AI_PROVIDER=openrouter, AI_MODEL=...,
+                     GOOGLE_CLIENT_ID=...)
+
+================================================================
+PHASE 2 — BUILD THE BACKEND FIRST
+================================================================
+
+The backend must be working before you touch the Android app.
+
+2.1. Bootstrap a Fastify project
+----------------------------------------------------------------
+  mkdir 12_Backend && cd 12_Backend
+  npm init -y
+  npm i fastify @fastify/cors @fastify/multipart pg embedded-postgres
+      bcrypt jose firebase-admin stripe zod dotenv
+  npm i -D typescript @types/node @types/pg @types/bcrypt tsx
+
+Create tsconfig.json:
+  {
+    "compilerOptions": {
+      "target": "ES2022",
+      "module": "NodeNext",
+      "moduleResolution": "NodeNext",
+      "strict": true,
+      "esModuleInterop": true,
+      "outDir": "dist",
+      "rootDir": "src"
+    },
+    "include": ["src/**/*"]
+  }
+
+Add to package.json:
+  "scripts": {
+    "build": "tsc -p .",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js"
+  }
+
+2.2. Create src/db.ts
+----------------------------------------------------------------
+Single shared pg.Pool that connects lazily to:
+  process.env.DATABASE_URL || "postgresql://app:app@127.0.0.1:5433/scottstechx"
+
+If DATABASE_URL is empty, the server should boot an embedded
+Postgres on 127.0.0.1:5433 and create a database `scottstechx`
+with user `app` / password `app`, then run all SQL files in
+migrations/ in alphabetical order, then call the same pool.
+
+2.3. Create src/auth.ts
+----------------------------------------------------------------
+  - bcrypt.hash / bcrypt.compare
+  - signJwt(payload) -> HS256 JWT, 24h expiry, issuer "scottstechx",
+    audience "scottstechx-api"
+  - verifyJwt(token) -> payload or throw UnauthorizedError
+  - requireAuth: Fastify preHandler that reads Bearer header and
+    attaches request.user
+
+2.4. Create src/firebase/admin.ts
+----------------------------------------------------------------
+  - initializeApp() with service account JSON at secrets/firebase-admin-key.json
+  - exports getFirebaseAuth(), verifyIdToken(idToken), getFirestore()
+
+2.5. Build these route modules (one file each under src/modules/<area>/)
+----------------------------------------------------------------
+  auth/login.route.ts
+    POST /api/v1/auth/register
+      body: { email, password, displayName, phone, role }
+      -> bcrypt hash, insert users row, sign JWT, return { token, user }
+    POST /api/v1/auth/login
+      -> verify bcrypt, sign JWT, return { token, user }
+    GET  /api/v1/auth/me           (requireAuth)
+    PATCH /api/v1/auth/me          (requireAuth) update profile fields
+    PATCH /api/v1/me/location      (requireAuth) update lat/lng/city
+
+  auth/firebase-auth.route.ts
+    POST /api/v1/auth/firebase/sign-in
+      body: { idToken } -> verifyIdToken, upsert users row, sign JWT
+    POST /api/v1/auth/firebase/send-verification-email
+      body: { idToken }
+      -> Firebase auth.generateEmailVerificationLink(email, { url: APP_DEEP_LINK })
+      -> Firebase automatically emails the link. Return ok.
+    GET  /api/v1/auth/firebase/me   (requireAuth)
+      -> return { id, email, displayName, role, emailVerified, firebaseUid }
+    POST /api/v1/auth/firebase/upgrade-to-seller
+      -> guard: requireAuth, require emailVerified
+      -> update users.role = 'seller' and copy seller fields
+
+  auth/google.route.ts
+    POST /api/v1/auth/google
+      body: { idToken } (Google OAuth)
+      -> exchange via google-auth-library, sign JWT
+
+  products/products.route.ts + products.service.ts
+    GET /api/v1/products
+      -> SELECT products joined with product_media, plus seller info
+      -> COALESCE(product_media.url, products.image_url) AS image_url
+      -> return array of:
+         { id, title, description, category, priceMinor, oldPriceMinor,
+           currency="UGX", stockQuantity, imageUrl, rating, ratingCount,
+           seller: { id, name, rating, location, verified }, location }
+    GET /api/v1/products/:id
+    POST /api/v1/seller/products        (requireAuth + role=seller)
+    GET  /api/v1/seller/products        (requireAuth + role=seller)
+    DELETE /api/v1/seller/products/:id  (requireAuth + role=seller)
+
+  seller/store-settings.route.ts
+    GET  /api/v1/seller/store-settings       (requireAuth + role=seller)
+    PATCH /api/v1/seller/store-settings      same; 9 sections:
+      store-profile: { storeName, description, logoUrl }
+      business-info: { legalName, tin, businessEmail, businessPhone }
+      store-location: { address, pickupInstructions, serviceRadiusKm }
+      delivery: { feeUgx, freeAboveUgx, codEnabled }
+      payments: { momoNumber, bankName, bankAccount }
+      notifications: { orderUpdates, buyerMessages, marketing, weeklyDigest }
+      security: { twoFactorEnabled }
+      policies: { returnsWindowDays, refundPolicy, terms }
+      help: { contactEmail, contactPhone }
+
+  seller/seller-public.route.ts
+    GET /api/v1/sellers/nearby?lat=&lng=&radiusKm=
+      -> Haversine distance, return closest sellers first
+    GET /api/v1/sellers/:id
+    GET /api/v1/seller/dashboard/stats      (requireAuth + role=seller)
+      -> revenue, orders, top product, low-stock count
+
+  user/user-full.route.ts
+    Register these (all requireAuth):
+      GET/POST/PATCH/DELETE /api/v1/me/addresses
+      GET/POST/PATCH/DELETE /api/v1/me/payment-methods
+      GET /api/v1/me/bookmarks
+      GET /api/v1/me/orders
+      GET /api/v1/me/orders/:id
+      GET/POST /api/v1/me/refunds
+      GET/POST /api/v1/me/support/tickets
+      GET /api/v1/me/faqs
+      GET/PATCH /api/v1/me/notifications
+      PATCH /api/v1/me/notifications/:id/read
+      GET/PATCH /api/v1/me/preferences   (theme, language, currency)
+      GET/POST/DELETE /api/v1/me/locations
+      POST /api/v1/me/change-password
+
+  ai/assistant.route.ts + ai/assistant.service.ts
+    POST /api/v1/ai/v2/ask
+      body: { prompt, screen, history? }
+      -> call OpenRouter with model from env
+      -> system prompt:
+         "You are the ScottsTechX AI assistant. Use the catalog context
+          provided in the user message to give store-specific answers.
+          Format with short paragraphs and bullet points. Be concise."
+      -> return { text, provider: "openrouter", model }
+    POST /api/v1/ai/v2/generate-product
+      body: { imageUrl?, hint }
+      -> call LLM with vision-capable model if imageUrl is a real URL,
+         otherwise heuristic
+      -> return { title, description, category, suggestedPriceMinor }
+
+  chat/chat.route.ts
+    GET  /api/v1/conversations
+      -> return inbox for current user (buyer or seller side)
+    GET  /api/v1/conversations/:id/messages
+    POST /api/v1/conversations/:id/messages
+      body: { text, imageUrl? }
+    POST /api/v1/conversations/:id/read     (mark read receipts)
+    POST /api/v1/conversations              (create or open thread)
+
+  cms/cms.route.ts
+    GET /api/v1/cms/:slug
+      -> return { slug, title, body, updatedAt }
+      -> slugs: "terms", "privacy", "buyer-protection", "about"
+      -> "about" body MUST contain:
+         "Kato Fred, Ugandan cybersecurity analyst, web dev and software dev."
+
+  stripe/payments.route.ts (skeleton - keys empty in .env)
+    POST /api/v1/orders/:orderId/pay
+    POST /api/v1/stripe/webhook
+
+2.6. src/server.ts
+----------------------------------------------------------------
+  - Load .env
+  - Start embedded Postgres if DATABASE_URL is empty
+  - Run all migrations/*.sql in order
+  - Run seed_marketplace.mjs once if products table empty
+  - Build Fastify with @fastify/cors (origin: "*")
+  - Register routes in this order:
+      registerAuthRoute, registerFirebaseAuthRoute, registerGoogleRoute
+      registerProductsRoute, registerStoreSettingsRoute
+      registerUserFullRoute, registerSellerPublicRoute
+      registerAiRoute, registerChatRoute, registerCmsRoute
+  - Add /healthz endpoint that returns { ok: true }
+  - app.listen({ port: process.env.PORT || 3001, host: "0.0.0.0" })
+
+2.7. SQL migrations (in /migrations, alphabetical order)
+----------------------------------------------------------------
+Number them NNNN_<topic>.sql. They run on every boot.
+Critical tables:
+  - users(id uuid pk, email unique, password_hash, role check in ('buyer','seller'),
+          display_name, phone, email_verified bool, firebase_uid, profile_photo_url,
+          created_at timestamptz default now())
+  - products(id uuid pk, seller_id fk users, title, description, category, brand,
+          price_minor bigint, old_price_minor bigint null, stock_quantity int,
+          image_url, rating numeric, rating_count int, is_flash_deal bool,
+          discount_percent int, location text, created_at)
+  - product_media(id, product_id fk, url, sort_order)
+  - conversations(id, buyer_id fk, seller_id fk, product_id fk null,
+          last_message, last_time, created_at)
+  - messages(id, conversation_id fk, sender_id fk, text, image_url, created_at)
+  - message_reads(conversation_id, user_id, last_read_at)
+  - addresses(id, user_id fk, label, line1, city, country, is_default)
+  - payment_methods(id, user_id fk, type ('card'|'momo'), label, last4, is_default)
+  - bookmarks(id, user_id fk, product_id fk, created_at)
+  - refund_claims(id, user_id fk, order_id fk, reason, status, created_at)
+  - store_settings(user_id pk, store_name, store_description, store_logo_url,
+          legal_name, tin, business_email, business_phone, address,
+          pickup_instructions, service_radius_km, delivery_fee_ugx,
+          free_above_ugx, cod_enabled, momo_number, bank_name, bank_account,
+          notif_order_updates, notif_buyer_messages, notif_marketing,
+          notif_weekly_digest, two_factor_enabled, returns_window_days,
+          refund_policy, terms, contact_email, contact_phone, updated_at)
+  - user_settings(user_id pk, theme text, language text, currency text,
+          notify_order_updates bool, notify_messages bool, notify_marketing bool,
+          updated_at)
+  - cms_pages(slug pk, title, body, updated_at)
+
+2.8. seed_marketplace.mjs
+----------------------------------------------------------------
+Use ESM. Connect via `pg` client. Truncate products, users (where
+role='seller' and id in seed list), product_media, conversations.
+Insert 6 sellers with realistic Ugandan business names:
+  Tech Hub Uganda (Kampala, verified, rating 4.7)
+  Fashion House  (Entebbe, verified, rating 4.5)
+  Sneaker King   (Jinja, rating 4.4)
+  Home & Beyond  (Kampala, rating 4.3)
+  Glamour Cosmetics (Kampala, verified, rating 4.6)
+  Uganda Crafts  (Jinja, verified, rating 4.8)
+Insert 24 products across categories Electronics, Fashion, Sports,
+Beauty, Home & Living, Groceries, Automotive (4 each).
+Use these real Unsplash images (one per product):
+  - Samsung phones -> photo-1610792516775-01de03eae630
+  - iPhones -> photo-1592286927505-1def25115558
+  - Laptops -> photo-1517336714731-489689fd1ca8
+  - Sneakers -> photo-1542291026-7eec264c27ff
+  - Rice/groceries -> photo-1586201375761-83885001b20f
+  - Cooking oil -> photo-1474979266404-7eaacbcd87c5
+  - TVs -> photo-1593359677879-a4bb92f829d1
+  - Lipsticks -> photo-1586495777744-4413f21062fa
+  - Soap -> photo-1600857544200-b2f666a9a2ec
+  - Watches -> photo-1523275335684-37898b6baf30
+  - Powerbanks -> photo-1609091839311-d5365f9ff1c5
+  - Headphones -> photo-1505740420928-5e560c06d30e
+  - Baskets -> photo-1556909114-f6e7ad7d3136
+  - Tires -> photo-1568844293986-8d0400bd4745
+  - Ankara dresses -> photo-1591561954557-26941169b49e (or similar)
+All URLs: append ?w=800 for Unsplash.
+Set 6 of them with is_flash_deal=true and discount_percent 13-24.
+Set lat/lng to roughly:
+  Kampala  0.3476, 32.5825
+  Entebbe  0.0611, 32.4444
+  Jinja    0.4255, 33.2041
+  Mbarara -0.6072, 30.6545
+  Gulu     2.7724, 32.2881
+  Mbale    1.0747, 34.1761
+
+2.9. Smoke-test the backend
+----------------------------------------------------------------
+  npm run dev   (in one terminal)
+  curl http://127.0.0.1:3001/healthz
+  curl http://127.0.0.1:3001/api/v1/products | head -c 1000
+  -> MUST return 24 products each with a real imageUrl starting
+     with https://images.unsplash.com/
+
+================================================================
+PHASE 3 — ANDROID APP SCAFFOLD
+================================================================
+
+  mkdir scottsx-android && cd scottsx-android
+  # Use Android Studio template or hand-roll build.gradle.kts
+
+3.1. build.gradle.kts (project root)
+----------------------------------------------------------------
+  - Kotlin 1.9.24
+  - AGP 8.5.2
+  - Compose BOM 2024.06.00
+  - Firebase BOM 33.x
+  - compileSdk 35, minSdk 30, targetSdk 35
+
+3.2. gradle.properties
+----------------------------------------------------------------
+  - kotlin.code.style=official
+  - android.useAndroidX=true
+  - org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g
+  - kotlin.compiler.execution.strategy=in-process  <-- IMPORTANT, the
+    Gradle JVM is sandboxed; using in-process compiler avoids OOM.
+
+3.3. app/build.gradle.kts dependencies
+----------------------------------------------------------------
+  - androidx.compose.bom + ui, material3, foundation, runtime, ui-tooling-preview
+  - androidx.navigation:navigation-compose
+  - androidx.lifecycle:lifecycle-runtime-ktx + lifecycle-viewmodel-compose
+  - com.google.firebase:firebase-auth-ktx
+  - io.coil-kt:coil-compose
+  - org.jetbrains.kotlinx:kotlinx-coroutines-android
+  - com.google.android.gms:play-services-base (for Auth)
+  - com.google.android.material:material (for Theme.Material3 parents)
+  - Test: junit, androidx.test.ext:junit
+
+3.4. AndroidManifest.xml
+----------------------------------------------------------------
+  - android:name=".ScottsTechXApp"
+  - android:usesCleartextTraffic="true"   <-- needed for http://127.0.0.1:3001
+  - android:networkSecurityConfig="@xml/network_security_config"
+  - <uses-permission android:name="android.permission.INTERNET" />
+  - <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+  - MainActivity launches the Compose host
+
+3.5. res/xml/network_security_config.xml
+----------------------------------------------------------------
+  base-config cleartextTrafficPermitted="false"
+  domain-config cleartextTrafficPermitted="true":
+    domain includeSubdomains="true">127.0.0.1
+    domain includeSubdomains="true">localhost
+    domain includeSubdomains="true">10.0.2.2  <-- emulator host
+
+3.6. ScottsTechXApp.kt (Application class)
+----------------------------------------------------------------
+  - onCreate: FirebaseApp.initializeApp(this)
+  - newImageLoader(): Coil ImageLoader with:
+      .okHttpClient(OkHttpClient().connectTimeout(8s).readTimeout(15s))
+      .memoryCache(MemoryCache.Builder(this).maxSizeBytes(maxMemory / 4))
+      .diskCache(DiskCache.Builder().directory(cacheDir/coil_image_cache)
+                            .maxSizeBytes(50 * 1024 * 1024))
+      .respectCacheHeaders(false)
+      .crossfade(true)
+
+================================================================
+PHASE 4 — CORE COMPOSE PRIMITIVES
+================================================================
+
+4.1. ui/theme/ScottsTechXColors.kt
+----------------------------------------------------------------
+  Define an object ScottsTechXColors with these properties:
+    PanelLight, PanelInputLight, OnLight, OnLightSecondary,
+    BluePrimary, BluePrimaryLight, BluePrimaryDark,
+    Background, Divider, SuccessGreen, ErrorRed, WarningAmber
+
+4.2. ui/components/InputField.kt
+----------------------------------------------------------------
+  @Composable fun InputField(
+      value: String,
+      onValueChange: (String) -> Unit,
+      label: String,
+      placeholder: String = "",
+      keyboardType: KeyboardType = KeyboardType.Text,
+      isPassword: Boolean = false,
+      isError: Boolean = false,
+      errorMessage: String? = null,
+      modifier: Modifier = Modifier,
+  )
+  Uses OutlinedTextField with EXPLICIT colors so dark text shows on
+  light background:
+    focusedTextColor = OnLight
+    unfocusedTextColor = OnLight
+    focusedBorderColor = BluePrimary
+    unfocusedBorderColor = OnLightSecondary.copy(alpha = 0.3f)
+    cursorColor = BluePrimary
+  Wraps in a Column with the label above, then the field, then error.
+
+4.3. ui/components/PrimaryButton.kt
+----------------------------------------------------------------
+  Full-width button, rounded 14dp, gradient BluePrimary to
+  BluePrimaryLight, white text, loading spinner swap.
+
+4.4. ui/components/ProductImage.kt
+----------------------------------------------------------------  @Composable fun ProductImage(
+      imageKey: String,
+      categoryLabel: String,
+      imageUrl: String? = null,
+      modifier: Modifier = Modifier,
+  ) {
+      // Use Coil.imageLoader(LocalContext.current) — NOT a fresh
+      // ImageLoader.Builder(ctx).build() (that drops network requests).
+      val loader = Coil.imageLoader(LocalContext.current)
+      val palette = remember(imageKey) { pickPalette(imageKey) }
+      Box(modifier) {
+          if (!imageUrl.isNullOrBlank()) {
+              AsyncImage(
+                  model = ImageRequest.Builder(LocalContext.current)
+                      .data(imageUrl)
+                      .crossfade(true)
+                      .build(),
+                  imageLoader = loader,
+                  contentDescription = categoryLabel,
+                  contentScale = ContentScale.Crop,
+                  modifier = Modifier.fillMaxSize(),
+              )
+          } else {
+              // Gradient placeholder with category letter
+              Box(modifier = Modifier.fillMaxSize().background(palette))
+              Text(categoryLabel.first().uppercase(),
+                   color = Color.White, fontSize = 48.sp, fontWeight = Bold,
+                   modifier = Modifier.align(Center))
+          }
+      }
+  }
+
+4.5. ui/components/ProductCard.kt
+----------------------------------------------------------------
+  Pure UI card. Takes a Product and shows ProductImage(categoryLabel=...,
+  imageUrl=product.imageUrl), title, price, rating, heart icon.
+  Heart click toggles wishlist (in-memory store).
+
+================================================================
+PHASE 5 — DATA LAYER
+================================================================
+
+5.1. data/remote/V2Client.kt
+----------------------------------------------------------------  ONE file. One OkHttpClient. One base URL.
+  Use kotlinx.coroutines.runBlocking inside suspend functions to
+  bridge OkHttp's blocking calls; or use the experimental OkHttp
+  coroutines extension. Easiest: use Java Future callbacks or
+  okhttp.enqueue + CompletableDeferred.
+
+  Suspend functions to write (one per endpoint):
+
+    // PRODUCTS
+    suspend fun fetchProductsList(): List<Product>
+    suspend fun fetchProductById(id: String): Product?
+    suspend fun createSellerProduct(payload: NewProductPayload): Product?
+    suspend fun deleteSellerProduct(id: String): Boolean
+
+    // AUTH
+    suspend fun signInWithFirebase(idToken: String): AuthResult
+    suspend fun sendFirebaseVerificationEmail(idToken: String): Boolean
+    suspend fun fetchFirebaseMe(): FirebaseUserMe?
+    suspend fun upgradeToSeller(idToken: String): AuthResult
+    suspend fun register(email, password, displayName, phone, role, sellerExtras?)
+    suspend fun login(email, password)
+    suspend fun fetchMe(): Me?
+
+    // SELLER
+    suspend fun fetchSellerProfile(): SellerProfile?
+    suspend fun updateSellerProfile(p: SellerProfile): Boolean
+    suspend fun fetchStoreSettings(): StoreSettings?
+    suspend fun updateStoreSettings(s: StoreSettings): Boolean
+    suspend fun fetchSellerDashboardStats(): SellerDashboardStats?
+    suspend fun fetchNearbySellers(lat, lng, radiusKm): List<NearbySeller>
+
+    // USER
+    suspend fun fetchAddresses(): List<Address>
+    suspend fun createAddress(a: Address): Address?
+    suspend fun updateAddress(id: String, a: Address): Boolean
+    suspend fun deleteAddress(id: String): Boolean
+    // same CRUD shape for payment-methods, locations, refunds, support tickets
+    suspend fun fetchOrders(): List<Order>
+    suspend fun fetchOrder(id: String): Order?
+    suspend fun fetchRefunds(): List<Refund>
+    suspend fun createRefund(orderId, reason): Refund?
+    suspend fun fetchBookmarks(): List<Product>
+    suspend fun toggleBookmark(productId: String): Boolean
+    suspend fun fetchNotifications(): List<Notification>
+    suspend fun markNotificationRead(id: String): Boolean
+    suspend fun fetchSupportTickets(): List<SupportTicket>
+    suspend fun createSupportTicket(t: SupportTicket): SupportTicket?
+    suspend fun fetchFaqs(): List<Faq>
+    suspend fun fetchUserSettings(): Settings
+    suspend fun saveSettings(s: Settings): Boolean
+    suspend fun changePassword(old, new): Boolean
+
+    // AI
+    suspend fun ask(prompt: String, screen: String): AiReply?
+
+    // CHAT
+    suspend fun fetchConversations(): List<Conversation>
+    suspend fun fetchMessages(conversationId: String): List<Message>
+    suspend fun sendMessage(conversationId: String, text: String): Message?
+    suspend fun markConversationRead(conversationId: String): Boolean
+
+    // CMS
+    suspend fun fetchCmsPage(slug: String): CmsPage?
+
+  Shared helpers:
+    private fun request(path, method, body?, auth=true): JSONObject
+      - Adds Bearer token from SessionCache
+      - Throws on non-2xx
+      - Parses JSON
+
+  Models are Kotlin data classes; use org.json for parsing.
+
+5.2. data/domain/MarketplaceModels.kt
+----------------------------------------------------------------  enum class ProductCategory(displayName, icon) {
+    All, Electronics, Fashion, HomeLiving, Beauty, Sports, Groceries,
+    Automotive, More
+  }
+
+  data class Product(
+      val id, val title, val description, val priceMinor, val oldPriceMinor?,
+      val currency="UGX", val stockQuantity, val imageUrl,
+      val category, val brand, val seller,
+      val rating, val ratingCount,
+      val isFlashDeal=false, val discountPercent=0,
+      val location="",
+  )
+
+  data class Brand(id, name)
+  data class Seller(id, name, rating, location, verified, logoUrl?)
+  data class Message(id, senderId, senderName, text, timeLabel,
+                     isFromBuyer, productContextId?,
+                     isRead=false, isDelivered=true, isTyping=false)
+  data class MessageThread(id, sellerId, sellerName, productId?, productName?,
+                           lastMessage, lastTimeLabel, unread=0)
+
+  enum class StorefrontTab { Products, Categories, Reviews, About }
+
+  Add companion fun ProductCategory.fromApiName(s: String): ProductCategory =
+    values().firstOrNull { it.displayName.equals(s, true) } ?: All
+
+================================================================
+PHASE 6 — NAVIGATION
+================================================================
+
+ui/navigation/AppNavigation.kt
+----------------------------------------------------------------  sealed object Routes {
+      const val WELCOME = "welcome"
+      const val LOGIN = "login"
+      const val SIGNUP = "signup"
+      const val BUYER_HOME = "buyer/home"
+      const val SELLER_HOME = "seller/home"
+      const val PRODUCT = "product/{id}"       ; fun product(id) = "product/$id"
+      const val MESSAGES = "messages"
+      const val THREAD = "thread/{sellerId}?productId={productId}"
+      const val AI = "ai"                      // buyer
+      const val SELLER_AI = "seller/ai"
+      const val SELLER_MESSAGES = "seller/messages"
+      const val PROFILE = "profile"
+      const val ACCOUNT = "settings/account"
+      const val ADDRESSES = "settings/addresses"
+      const val PAYMENT_METHODS = "settings/payment-methods"
+      const val THEME = "settings/theme"
+      const val NEARBY = "nearby"
+      const val NOTIFICATIONS = "notifications"
+      const val BECOME_SELLER = "become-seller"
+      const val AI_PERSONALIZATION = "ai-personalization"
+      const val CMS = "cms/{slug}"             ; fun cms(slug) = "cms/$slug"
+      const val SELLER_STORE_SETTING_DETAIL =
+          "seller/store-settings/{section}"   ; fun sellerStoreSetting(s) = "seller/store-settings/$s"
+      const val BUYER_PROFILE_SETTINGS = "settings/buyer-profile"
+      const val ADD_PRODUCT = "seller/add-product"
+  }
+
+  NavHost(navController, startDestination = Routes.WELCOME) {
+      composable(WELCOME)    { WelcomeScreen(...) }
+      composable(LOGIN)      { LoginScreen(...) }
+      composable(SIGNUP)     { SignUpScreen(...) }
+      composable(BUYER_HOME) { BuyerHomeScreen(...) }
+      composable(SELLER_HOME){ SellerHomeScreen(...) }
+      composable(PRODUCT, arguments = listOf(navArgument("id"){type=NavType.StringType})) {
+          ProductDetailScreen(...)
+      }
+      composable(THREAD, arguments = ...) { MessageThreadScreen(...) }
+      composable(AI)         { RealAiChatScreen(...) }       // BUYER AI
+      composable(SELLER_AI)  { SellerAIAssistantScreen(...) } // SELLER AI
+      composable(SELLER_MESSAGES) { SellerMessagesScreen(...) }
+      composable(PROFILE)    { ProfileScreen(...) }
+      composable(ACCOUNT)    { AccountSettingsScreen(...) }
+      composable(ADDRESSES)  { AddressesScreen(...) }
+      composable(PAYMENT_METHODS){ PaymentMethodsScreen(...) }
+      composable(THEME)      { ThemeScreen(...) }
+      composable(NEARBY)     { NearbyScreen(...) }
+      composable(NOTIFICATIONS){ NotificationsScreen(...) }
+      composable(BECOME_SELLER){ BecomeSellerScreen(...) }
+      composable(AI_PERSONALIZATION){ AiPersonalizationScreen(...) }
+      composable(CMS, arguments = ...) { CmsScreen(slug, ...) }
+      composable(SELLER_STORE_SETTING_DETAIL, arguments = ...) {
+          StoreSettingsDetailScreen(section, ...)
+      }
+      composable(BUYER_PROFILE_SETTINGS){ ProfileSettingsScreen(...) }
+      composable(ADD_PRODUCT){ AddProductScreen(...) }
+  }
+
+================================================================
+PHASE 7 — KEY SCREENS (build each as a @Composable function)
+================================================================
+
+Each screen is a function file in ui/screens/. Keep them
+self-contained: their own remember{} state, no shared singletons
+beyond SessionCache and UserPrefs.
+
+7.1. BuyerHomeScreen.kt
+----------------------------------------------------------------
+  Scaffold with top bar (hamburger + location chip + avatar),
+  LazyColumn body:
+    hero carousel, category row, flash-deals row, recommended grid
+  Bottom nav: Home / Nearby / [AI] / Wishlist / Profile
+  Center position is the AI button (large FAB).
+  LaunchedEffect(Unit): V2Client.fetchProductsList() -> state
+  Tap product -> Routes.product(id)
+
+7.2. SellerHomeScreen.kt
+----------------------------------------------------------------
+  Same shape but flipped: hero card with store stats,
+  product inventory grid, low-stock alerts.
+  Bottom nav: see SellerBottomBar.
+
+7.3. SellerBottomBar.kt  (THE BALANCED LAYOUT)
+----------------------------------------------------------------
+  Use a weighted Row split:
+      Row {
+          Row(weight=1f, SpaceEvenly) { Home ; AI }
+          Spacer(width=72.dp)        // reserve room for the FAB
+          Row(weight=1f, SpaceEvenly) { Messages ; Analytics }
+      }
+  Center FAB: 64dp circle, BluePrimary gradient, Add icon, scale anim
+  on press. The Add tab is reserved in the enum:
+      enum class SellerBottomTab {
+          Home("Home", Icons.Filled.Home),
+          Add("Add", Icons.Filled.AddCircle),     // not rendered as nav item
+          AI("AI Assistant", Icons.Filled.AutoAwesome),
+          Messages("Messages", Icons.Filled.ChatBubble),
+          Analytics("Analytics", Icons.Filled.Analytics),
+      }
+  When rendering the bar, skip the Add tab and only render the
+  other four in two balanced groups.
+
+7.4. MessageThreadScreen.kt  (enterprise features)
+----------------------------------------------------------------
+  Top bar: seller name + product context pill.
+  LazyColumn of MessageBubble:
+    - Sender bubbles (right, BluePrimary gradient)
+    - Receiver bubbles (left, white)
+    - Each sender bubble shows "✓ Delivered" or "✓✓ Read" (blue when read)
+    - Tail of bubble is 4dp on sender side, 14dp on receiver side
+  Typing indicator bubble above composer (animated dots).
+  Composer:
+    [+]   [BasicTextField]   [⭐ quick replies toggle]   [Send]
+    The + is attach (future file picker).
+    The ⭐ toggles a row of preset chips: "Got it", "On the way",
+    "Thanks!", "Will check". Tapping inserts that text into composer.
+    Send button greyed when input empty.
+
+7.5. NearbyScreen.kt
+----------------------------------------------------------------
+  At top: LocationStatusCard (gradient) showing 6 Uganda cities
+  as tappable chips. Below: FilterSortBar with:
+    - Horizontal scrolling category chips
+    - Sort pill that cycles: Nearest -> Top rated -> Most products
+    - Verified-only toggle pill
+    - Radius slider 1-100 km
+  Then a LazyColumn of filtered+sorted sellers.
+  Derive the filtered list ONCE before the LazyColumn:
+      val filteredSellers = sellers.asSequence()
+          .filter { it.distanceKm <= maxRadiusKm }
+          .sortedWith(when (sortBy) {
+              "rating"   -> compareByDescending { it.rating }
+              "products" -> compareByDescending { it.products.size }
+              else       -> compareBy { it.distanceKm }
+          }).toList()
+
+7.6. SignUpScreen.kt (FIREBASE EMAIL LINK)
+----------------------------------------------------------------
+  Form: name, email, phone, password, confirmPassword.
+  After email InputField:
+    If email looks valid (regex or android.util.Patterns.EMAIL_ADDRESS),
+    show "Send verification email" button.
+    On click:
+        FirebaseAuth.getInstance().currentUser?.sendEmailVerification()
+            ?.addOnCompleteListener { task -> ... }
+    After success, show "Verification email sent." message and a
+    button "I've verified — continue". On click:
+        val user = FirebaseAuth.getInstance().currentUser
+        user.reload().addOnCompleteListener {
+            emailVerified = user.isEmailVerified
+        }
+  The Create Account button is blocked unless emailVerified == true.
+
+7.7. AddProductScreen.kt (AI suggest from photo)
+----------------------------------------------------------------
+  Multi-step wizard. Step 0 (Basics): name, description, category
+  chip row. Above the category row:
+    "✨ AI suggest from photo" OutlinedButton.
+  Enabled only when imageUrls.isNotEmpty(). On click:
+    val first = imageUrls.first().lowercase()
+    aiSuggestedName = heuristicName(first)
+    aiSuggestedDescription = "Carefully sourced and inspected before listing. ..."
+    aiSuggestedCategory = heuristicCategory(first)
+  Show preview with "Apply" and "Dismiss" buttons.
+  Steps 1..3 handle pricing, photos, safety/publish.
+
+7.8. SellerAIAssistantScreen.kt
+----------------------------------------------------------------
+  Gradient top bar (blue -> purple -> pink).
+  4 quick-tool cards in a 2x2 grid:
+    Sales analytics (Analytics icon)
+    Low stock alerts (Inventory icon)
+    Pricing tips (PriceCheck icon)
+    Marketing ideas (Campaign icon)
+  Each tool tap pushes a user+ai message into the chat log.
+  Below: scrollable chat log with user + AI bubbles.
+  Bottom: composer with rounded input + Send FAB.
+
+7.9. RealAiChatScreen.kt (BUYER AI)
+----------------------------------------------------------------
+  Same shape as seller AI but simpler:
+    - 4 quick-reply chips at the top (HorizontalPager)
+    - Chat log
+    - Composer
+  Before sending: fetch live catalog and prepend as context:
+      val products = V2Client.fetchProductsList()
+      val brief = products.take(40).joinToString("\n") {
+        "- ${it.title} (${it.category}) UGX ${it.priceUgx/100} from ${it.seller.name}"
+      }
+      val fullMessage = "Live catalog ($size):\n$brief\n\nUser: $prompt"
+      V2Client.ask(fullMessage, screen="ai-chat")
+
+7.10. ThemeScreen.kt
+----------------------------------------------------------------
+  Three radio buttons: Light, Dark, System.
+  On change, save to UserPrefs.themeMode and reload.
+
+7.11. CmsScreen.kt
+----------------------------------------------------------------
+  Takes a `slug` nav arg. Calls V2Client.fetchCmsPage(slug).
+  Shows title in a sticky header, body text in a ScrollableColumn.
+  For "about" the body must contain the Kato Fred bio.
+
+================================================================
+PHASE 8 — LOCAL DATA FALLBACK
+================================================================
+
+data/MarketplaceDataSource.kt
+----------------------------------------------------------------
+  Holds hardcoded products for offline / first-launch demo.
+  Use REAL UNSPLASH URLs (the same 24 the seed inserts):
+      imageUrl = "https://images.unsplash.com/photo-1610792516775-01de03eae630?w=800"
+  DO NOT use placeholder text like "phone" or "laptop" — those
+  make Coil silently fail.
+  Maps: flashDeals (first 6), recommended (rating >= 4.4),
+        productsByCategory(cat), heroBanners (3), benefits (4).
+
+================================================================
+PHASE 9 — BUILD AND INSTALL
+================================================================
+
+  # Android
+  set JAVA_HOME=<your-jdk-17-path>
+  set PATH=%JAVA_HOME%\bin;%PATH%
+  gradlew --no-daemon --offline :app:assembleDebug
+
+  # APK lands at app/build/outputs/apk/debug/app-debug.apk
+
+  # Install on device
+  adb -s <serial> install -r app-debug.apk
+  adb -s <serial> shell wm dismiss-keyguard
+  adb -s <serial> shell am start -n com.scottsx.app/com.scottsx.app.MainActivity
+
+================================================================
+PHASE 10 — VERIFICATION CHECKLIST
+================================================================
+
+Run all of these before declaring done:
+
+  Backend
+    [ ] curl http://127.0.0.1:3001/healthz returns {ok:true}
+    [ ] curl http://127.0.0.1:3001/api/v1/products returns 24 items
+        with imageUrl starting "https://images.unsplash.com/"
+    [ ] POST /api/v1/auth/register creates a user and returns JWT
+    [ ] POST /api/v1/auth/firebase/send-verification-email returns ok
+    [ ] GET /api/v1/cms/about returns the Kato Fred bio
+
+  Android
+    [ ] App launches and shows buyer home
+    [ ] Product photos render (NOT burgundy gradient placeholders)
+    [ ] Tapping a product opens ProductDetail
+    [ ] Buyer bottom nav: Home / Nearby / [AI FAB] / Wishlist / Profile
+    [ ] Seller bottom nav (sign in as seller): Home / AI / [Add] /
+        Messages / Analytics — balanced, AI not under Add
+    [ ] SignUp: "Send verification email" succeeds
+    [ ] AddProduct: "AI suggest from photo" produces title+desc+category
+    [ ] Messaging: read receipts visible, typing bubble appears,
+        quick replies toggle works
+    [ ] Nearby: filter chips, sort pill, radius slider, verified toggle
+    [ ] ThemeScreen switches light/dark/system
+    [ ] CmsScreen renders the about page with Kato Fred bio
+
+================================================================
+PHASE 11 — ORDER OF IMPLEMENTATION
+================================================================
+
+Build in this order so each layer is testable before the next:
+
+  1. Backend: db.ts, auth.ts, server.ts, migrations, auth routes
+     -> test with curl
+  2. Backend: products routes + seed_marketplace.mjs
+     -> curl /api/v1/products returns 24 items
+  3. Backend: store-settings + user-full routes
+     -> curl PATCH /api/v1/seller/store-settings
+  4. Backend: AI assistant route
+     -> curl POST /api/v1/ai/v2/ask returns text
+  5. Backend: chat + cms routes
+  6. Android scaffold: Gradle, Manifest, ScottsTechXApp, MainActivity,
+     a single test screen showing "Hello ScottsTechX"
+     -> build and install on device
+  7. Android: V2Client + auth + login/signup screens
+     -> sign up a user, verify with curl
+  8. Android: BuyerHomeScreen + ProductCard + ProductImage
+     -> product photos load from backend
+  9. Android: Messages + enterprise features
+  10. Android: NearbyScreen with filter/sort/radius
+  11. Android: AddProduct with AI suggest from photo
+  12. Android: SellerAIAssistantScreen
+  13. Android: ThemeScreen + CmsScreen + all Settings sub-screens
+  14. Android: SellerBottomBar with the balanced 2-half layout
+  15. Final smoke test on device with every flow
+
+================================================================
+PHASE 12 — WHAT MAKES SCOTTSTECHX UNIQUE
+================================================================
+
+  - Ugandan-first: UGX currency, 6 real cities, Ugandan sellers,
+    founder bio "Kato Fred, Ugandan cybersecurity analyst, web dev
+    and software dev." in the about page.
+  - Real Firebase email-link verification (NOT 6-digit fake codes).
+  - Two AI assistants that ACTUALLY USE THE LIVE CATALOG.
+  - Enterprise-grade messaging with read receipts and quick replies.
+  - Buyer-vs-seller bottom navs that are NOT just labels - each
+    half is balanced and the FAB sits visually centered.
+  - 30+ CRUD endpoints behind one typed V2Client, not raw OkHttp
+    scattered across screens.
+
+================================================================
+EOF
