@@ -1,0 +1,92 @@
+name: Backend CI
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "12_Backend/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "12_Backend/**"
+      - ".github/workflows/backend-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: 12_Backend
+
+jobs:
+  verify:
+    name: typecheck / lint / test / boot
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: 12_Backend/package-lock.json
+
+      # `npm ci` is the correct choice in CI: it installs strictly from the
+      # lockfile and fails if package.json and the lockfile disagree.
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      # Boots a real embedded Postgres, applies all migrations and exercises
+      # the RLS policies with a NOBYPASSRLS role. No external services needed.
+      - name: Test
+        run: npm test
+
+      # Compiles and runs `node dist/server.js` exactly as the Dockerfile,
+      # railway.toml and render.yaml do, then asserts /healthz serves traffic.
+      # The unit suite imports buildServer() directly and cannot catch a
+      # broken production entrypoint.
+      - name: Production boot check
+        run: npm run test:boot
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: 12_Backend
+          file: 12_Backend/Dockerfile
+          target: runtime
+          push: false
+          load: true
+          tags: scottstechx-backend:ci
+
+      - name: Smoke-test the image entrypoint
+        run: |
+          # The container must not exit immediately. Without a database it is
+          # expected to fail on migrations — what we assert here is that it
+          # actually reaches that stage instead of silently exiting 0.
+          output="$(docker run --rm --env JWT_SECRET=ci-secret-that-is-long-enough-for-validation-32 \
+            scottstechx-backend:ci 2>&1 || true)"
+          echo "$output"
+          if echo "$output" | grep -q "server failed to start"; then
+            echo "OK: entrypoint executed and reported a startup error as expected."
+          else
+            echo "FAIL: entrypoint produced no startup attempt — dist/server.js may be a no-op."
+            exit 1
+          fi

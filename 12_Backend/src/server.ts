@@ -31,6 +31,7 @@
  */
 
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
+import { pathToFileURL } from "node:url";
 import { AppError, NotImplementedError } from "./errors.js";
 import { runMigrations } from "./migrate.js";
 import { registerCheckoutRoute } from "./modules/orders/checkout.route.js";
@@ -140,7 +141,20 @@ export async function startServer(): Promise<FastifyInstance> {
   return app;
 }
 
-const isMain = import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, "/")}`;
+// Detect "was this file run directly?" in a cross-platform way.
+//
+// The previous hand-rolled check built a file:// URL by string concatenation:
+//   `file:///${process.argv[1].replace(/\\/g, "/")}`
+// On POSIX, argv[1] is an absolute path already starting with "/", so this
+// produced "file:////home/app/dist/server.js" (four slashes) and never matched
+// import.meta.url ("file:///home/app/dist/server.js"). The server therefore
+// exited 0 immediately under `node dist/server.js` — the exact CMD used by the
+// Dockerfile, railway.toml and render.yaml.
+//
+// pathToFileURL() performs the correct platform-aware conversion (drive
+// letters, UNC paths, percent-encoding) on both Windows and POSIX.
+const entrypoint = process.argv[1];
+const isMain = entrypoint !== undefined && import.meta.url === pathToFileURL(entrypoint).href;
 if (isMain) {
   startServer().catch((err) => {
     console.error("server failed to start:", err);

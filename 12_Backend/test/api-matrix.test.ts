@@ -252,6 +252,9 @@ describe("G5 API: openapi.json matches the running service", () => {
     const spec = JSON.parse(readFileSync(specPath, "utf-8"));
 
     for (const [path, ops] of Object.entries(spec.paths as Record<string, Record<string, { responses: Record<string, unknown> }>>)) {
+      // Every documented path must be a rooted, concrete URL path.
+      expect(path.startsWith("/"), `spec path ${path} must start with "/"`).toBe(true);
+
       for (const [method, op] of Object.entries(ops)) {
         const codes = Object.keys(op.responses);
         expect(codes.length).toBeGreaterThan(0);
