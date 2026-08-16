@@ -16,7 +16,6 @@
     "smoke": "tsx src/smoke.ts"
   },
   "dependencies": {
-    "@embedded-postgres/windows-x64": "^18.4.0-beta.17",
     "@fastify/multipart": "^10.1.0",
     "@types/node": "^22.20.1",
     "@types/pg": "^8.20.0",
@@ -29,6 +28,10 @@
     "zod": "^4.4.3"
   },
   "allowScripts": {
+    "@embedded-postgres/darwin-arm64@18.4.0-beta.17": true,
+    "@embedded-postgres/darwin-x64@18.4.0-beta.17": true,
+    "@embedded-postgres/linux-arm64@18.4.0-beta.17": true,
+    "@embedded-postgres/linux-x64@18.4.0-beta.17": true,
     "@embedded-postgres/windows-x64@18.4.0-beta.17": true
   },
   "devDependencies": {
