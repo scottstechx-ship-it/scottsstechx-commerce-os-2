@@ -22,7 +22,7 @@ import { query, withTransaction } from "../src/db.js";
 let baseUrl = "";
 let buyerToken = "";
 let driverToken = "";
-let otherBuyerId = "88888888-8888-4888-8888-888888888888";
+const otherBuyerId = "88888888-8888-4888-8888-888888888888";
 
 beforeAll(async () => {
   await setupOnce();
@@ -204,6 +204,25 @@ describe("G3 Security: RLS — cross-tenant denial", () => {
     expect(co.status).toBe(201);
 
     const otherToken = await mintToken("buyer", otherBuyerId);
+
+    // Tenant isolation must hold at the HTTP layer, not only in SQL. The
+    // buyer writes a private chat message, then the other buyer requests the
+    // same session over the API and must receive none of it.
+    const sessionId = `sess-${randomIdempotencyKey()}`;
+    const sent = await postJson("/api/v1/chat/messages",
+      { "authorization": `Bearer ${buyerToken}` },
+      { content: "private order details", sessionId, role: "buyer" });
+    expect(sent.status).toBe(201);
+
+    const leaked = await fetch(
+      `${baseUrl}/api/v1/chat/messages?sessionId=${encodeURIComponent(sessionId)}`,
+      { headers: { "authorization": `Bearer ${otherToken}` } },
+    );
+    expect(leaked.status).toBe(200);
+    const leakedBody = await leaked.json();
+    expect(Array.isArray(leakedBody)).toBe(true);
+    expect(leakedBody).toHaveLength(0);
+
     // Other buyer cannot even probe the order via a SELECT — RLS denies.
     // We SET LOCAL ROLE rls_tester (no BYPASSRLS) to enforce RLS for the
     // probe connection; the postgres superuser would bypass it.

@@ -8,6 +8,12 @@ services:
     name: scottstechx-api
     runtime: docker
     plan: starter
+    # The backend lives in 12_Backend/, not at the repository root. Without
+    # these two keys Render looks for ./Dockerfile at the root, which does not
+    # exist, and the deploy fails before it starts.
+    rootDir: 12_Backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
